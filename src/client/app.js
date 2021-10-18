@@ -1,34 +1,3 @@
-import img_data from "./img_data.js";
-
-const display_projection = function() {
-    const z = JSON.parse(img_data);
-    const trace1 = {
-        z: z,
-        type: 'image'
-    };
-
-    const layout = {
-        width: 512,
-        height: 512,
-        margin: {
-            t: 30,
-            l: 30,
-            r: 30,
-            b: 30
-        },
-        xaxis: {
-            range: [200, 300]
-        },
-        yaxis: {
-            range: [200, 300]
-        }
-    };
-
-    const data = [trace1];
-
-    Plotly.newPlot('projection', data, layout);
-}
-
 const display_trace = function() {
     const trace1 = {
       x: [1, 2, 3, 4],
@@ -47,7 +16,53 @@ const display_trace = function() {
     Plotly.newPlot('trace_container', data);
 }
 
+class CellLabelingApp {
+    constructor() {
+        $.get('http://localhost:5000/get_random_roi', data => {
+            this.experiment_id = data['experiment_id'];
+            this.roi = data['roi'];
+            console.log(data);
+         }).then(() => {
+            this.displayProjection();
+         });
+    }
+
+    async displayProjection() {
+        const projection_type = $('#projection_type').children("option:selected").val();
+        const url = `http://localhost:5000/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
+        $.get(url, async data => {
+            const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
+
+            const trace1 = {
+                source: data['projection'],
+                type: 'image'
+            };
+        
+            const layout = {
+                width: 512,
+                height: 512,
+                margin: {
+                    t: 30,
+                    l: 30,
+                    r: 30,
+                    b: 30
+                },
+                xaxis: {
+                    range: fovBounds['x']
+                },
+                yaxis: {
+                    range: fovBounds['y']
+                }
+            };
+                
+            Plotly.newPlot('projection', [trace1], layout);
+        })
+    }    
+}
+
 $( document ).ready(function() {
+    $.get('http://localhost:5000/get_random_roi', data => {
+       const app = new CellLabelingApp();
+    });
     display_trace();
-    display_projection();
 });

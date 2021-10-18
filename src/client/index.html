@@ -88,31 +88,37 @@
         </div>
         <div class="col">
             <div id="projection_container">
-                <div id="projection"></div>
+                <div id="projection" style="width: 512px; height: 512px"></div>
                 <div id="projection_settings" style="margin-left: 30px">
-                    <div class="dropdown mt-4">
-                        <a class="btn btn-light dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            Projection type
-                        </a>
-                        <div class="dropdown-menu" aria-labelledby="dropdownMenuLink">
-                            <a class="dropdown-item" href="#">Max</a>
-                            <a class="dropdown-item" href="#">Average</a>
-                            <a class="dropdown-item" href="#">Correlation</a>
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="form-group">
+                                <label for="projection_type">Projection type</label>
+                                <select class="form-select" id="projection_type">
+                                    <option value="max" selected>Max</option>
+                                    <option value="avg">Average</option>
+                                    <option value="correlation">Correlation</option>
+                                  </select>
+                            </div>
                         </div>
                     </div>
-                    <div class="form-check form-check-inline mt-4">
-                        <input type="checkbox" class="form-check-input"
-                            id="projection_include_mask_outline">
-                        <label class="form-check-label" for="projection_include_mask_outline">
-                            include mask outline
-                        </label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" class="form-check-input form-check-inline"
-                            id="projection_include_surrounding_rois">
-                        <label class="form-check-label" for="projection_include_surrounding_rois">
-                            include surrounding ROIs
-                        </label>
+                    <div class="row">
+                        <div class="col">
+                            <div class="form-check form-check-inline mt-4">
+                                <input type="checkbox" class="form-check-input"
+                                    id="projection_include_mask_outline">
+                                <label class="form-check-label" for="projection_include_mask_outline">
+                                    include mask outline
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input type="checkbox" class="form-check-input form-check-inline"
+                                    id="projection_include_surrounding_rois">
+                                <label class="form-check-label" for="projection_include_surrounding_rois">
+                                    include surrounding ROIs
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
