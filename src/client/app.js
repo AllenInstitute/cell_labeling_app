@@ -1,21 +1,3 @@
-const display_trace = function() {
-    const trace1 = {
-      x: [1, 2, 3, 4],
-      y: [10, 15, 13, 17],
-      type: 'scatter'
-    };
-
-    const trace2 = {
-      x: [1, 2, 3, 4],
-      y: [16, 5, 11, 9],
-      type: 'scatter'
-    };
-
-    const data = [trace1, trace2];
-
-    Plotly.newPlot('trace_container', data);
-}
-
 class CellLabelingApp {
     constructor() {
         this.experiment_id = null;
@@ -62,6 +44,27 @@ class CellLabelingApp {
 
             $("#projection_include_mask_outline").attr("disabled", false);
             $("#projection_include_surrounding_rois").attr("disabled", false);
+        });
+    }
+
+    displayTrace() {
+        const url = `http://localhost:5000/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`;
+        return $.get(url, data => {
+            const trace = {
+                x: _.range(data['trace'].length),
+                y: data['trace']
+            }
+
+            const layout = {
+                xaxis: {
+                    title: 'Timestep'
+                },
+                yaxis: {
+                    title: 'Trace magnitude'
+                }
+            }
+
+            Plotly.newPlot('trace', [trace], layout);
         });
     }
 
@@ -167,7 +170,6 @@ $( document ).ready(async function() {
     const app = new CellLabelingApp();
     await app.getRandomExperiment();
     await app.displayProjection();
-    await app.getContours();
-
-    display_trace();
+    app.getContours();
+    app.displayTrace();
 });

@@ -127,6 +127,27 @@ def get_projection():
     }
 
 
+@app.route('/get_trace')
+def get_trace():
+    experiment_id = request.args['experiment_id']
+    roi_id = request.args['roi_id']
+
+    artifact_dir = Path('/allen/aibs/informatics/danielsf'
+                    '/classifier_prototype_data')
+    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    with h5py.File(artifact_path, 'r') as f:
+        trace = (f['traces'][roi_id][()])
+
+    # Trace seems to decrease to 0 at the end which makes visualization worse
+    # Trim to last nonzero index
+    trace = trace[:trace.nonzero()[0][-1]]
+
+    trace = trace.tolist()
+    return {
+        'trace': trace
+    }
+
+
 @app.route('/get_fov_bounds', methods=['POST'])
 def get_fov_bounds():
     roi = request.get_json(force=True)
