@@ -18,19 +18,102 @@ const display_trace = function() {
 
 class CellLabelingApp {
     constructor() {
-        $.get('http://localhost:5000/get_random_roi', data => {
-            this.experiment_id = data['experiment_id'];
-            this.roi = data['roi'];
-            console.log(data);
-         }).then(() => {
-            this.displayProjection();
-         });
+        this.experiment_id = null;
+        this.roi = null;
+        this.show_current_roi_outline_on_projection = false;
+        this.show_all_roi_outlines = false;
+        this.roi_contours = null;
+        this.addListeners();
+    }
+
+    addListeners() {
+        $('#projection_include_mask_outline').on('click', () => {
+            this.show_current_roi_outline_on_projection = !this.show_current_roi_outline_on_projection;
+            this.displayContoursOnProjection();
+        })
+
+        $('#projection_include_surrounding_rois').on('click', () => {
+            this.show_all_roi_outlines = !this.show_all_roi_outlines;
+            this.displayContoursOnProjection();
+        })
+    }
+
+    async getRandomExperiment() {
+        return $.get('http://localhost:5000/get_random_roi', data => {
+                this.experiment_id = data['experiment_id'];
+                this.roi = data['roi'];
+                })
+    }
+
+    async getContours() {
+        const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}`;
+        return $.get(url, data => {
+            this.roi_contours = data['contours'];
+        });
+    }
+
+    async displayContoursOnProjection() {
+        let roi_contours = this.roi_contours;
+        
+        if (!this.show_all_roi_outlines) {
+            roi_contours = roi_contours.filter(x => x['id'] == this.roi['id']);
+        } 
+        
+        if (!this.show_current_roi_outline_on_projection) {
+            roi_contours = roi_contours.filter(x => x['id'] != this.roi['id']);
+        }
+
+        roi_contours = roi_contours.filter(x => x['contour'].length > 0);
+
+
+        const paths = roi_contours.map(obj => {
+            return obj['contour'].map((coordinate, index) => {
+                let instruction;
+                const [x, y] = coordinate;
+                if (index == 0) {
+                    instruction = `M ${x},${y}`;
+                } else {
+                    instruction = `L${x},${y}`;
+                }
+
+                if (index == obj['contour'].length - 1) {
+                    instruction = `${instruction} Z`;
+                }
+
+                return instruction;
+            });
+        });
+        const pathStrings = paths.map(x => x.join(' '));
+        const colors = roi_contours.map(obj => {
+            let color;
+            if (obj['id'] == this.roi['id']) {
+                color = [255, 0, 0];
+            } else {
+                color = obj['color'];
+            }
+            return color;
+        });
+        
+        const shapes = _.zip(pathStrings, colors).map(obj => {
+            const [path, color] = obj;
+            return {
+                type: 'polyline',
+                path: path,
+                opacity: 0.75,
+                line: {
+                  color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+                }
+            }
+        });
+
+        Plotly.relayout('projection', {'shapes': shapes});
+
     }
 
     async displayProjection() {
         const projection_type = $('#projection_type').children("option:selected").val();
         const url = `http://localhost:5000/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
-        $.get(url, async data => {
+        return $.get(url, async data => {
             const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
 
             const trace1 = {
@@ -60,9 +143,11 @@ class CellLabelingApp {
     }    
 }
 
-$( document ).ready(function() {
-    $.get('http://localhost:5000/get_random_roi', data => {
-       const app = new CellLabelingApp();
-    });
+$( document ).ready(async function() {
+    const app = new CellLabelingApp();
+    await app.getRandomExperiment();
+    await app.displayProjection();
+    await app.getContours();
+
     display_trace();
 });

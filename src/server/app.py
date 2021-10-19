@@ -5,13 +5,16 @@ import random
 import re
 from io import BytesIO
 from pathlib import Path
+from typing import List
 
+import cv2
 import h5py
 import numpy as np
 from PIL import Image
 from flask import Flask, request
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI
+from ophys_etl.types import ExtractROI
 
 app = Flask(__name__)
 
@@ -38,6 +41,45 @@ def get_random_roi_from_experiment(experiment_id: str) -> dict:
         'y': rois[roi_idx]['y'],
         'width': rois[roi_idx]['width'],
         'height': rois[roi_idx]['height']
+    }
+
+
+@app.route('/get_roi_contours')
+def get_roi_contours():
+    experiment_id = request.args.get('experiment_id')
+    current_roi_id = request.args.get('current_roi_id')
+
+    artifact_dir = Path('/allen/aibs/informatics/danielsf'
+                    '/classifier_prototype_data')
+    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    with h5py.File(artifact_path, 'r') as f:
+        rois = json.loads((f['rois'][()]))
+        roi_color_map = json.loads(f['roi_color_map'][()])
+
+    all_contours = []
+
+    for roi in rois:
+        mask = roi['mask']
+        x = roi['x']
+        y = roi['y']
+        width = roi['width']
+        height = roi['height']
+        id = roi['id']
+
+        blank = np.zeros((512, 512), dtype='uint8')
+        blank[y:y + height, x:x + width] = mask
+        contours, _ = cv2.findContours(blank, cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_NONE)
+        contours = contours[0].reshape(contours[0].shape[0], 2).tolist() if \
+            len(contours) == 1 else []
+        color = (255, 0, 0) if id == current_roi_id else roi_color_map[str(id)]
+        all_contours.append({
+            'contour': contours,
+            'color': color,
+            'id': id
+        })
+    return {
+        'contours': all_contours
     }
 
 
@@ -93,6 +135,8 @@ def get_fov_bounds():
     frame_shape = [float(x) for x in frame_shape]
 
     x_range = [origin[1], origin[1] + frame_shape[1]]
+
+    # Reversing because origin of plot is top-left instead of bottom-left
     y_range = [origin[0] + frame_shape[0], origin[0]]
 
     print(x_range)
