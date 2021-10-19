@@ -24,6 +24,11 @@ class CellLabelingApp {
         this.show_all_roi_outlines = false;
         this.projection_is_shown = false;
         this.roi_contours = null;
+
+        // Disable contour toggle checkboxes until contours have loaded
+        $("#projection_include_mask_outline").attr("disabled", true);
+        $("#projection_include_surrounding_rois").attr("disabled", true);
+
         this.addListeners();
     }
 
@@ -54,6 +59,9 @@ class CellLabelingApp {
         const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}`;
         return $.get(url, data => {
             this.roi_contours = data['contours'];
+
+            $("#projection_include_mask_outline").attr("disabled", false);
+            $("#projection_include_surrounding_rois").attr("disabled", false);
         });
     }
 
