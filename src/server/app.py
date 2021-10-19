@@ -5,18 +5,21 @@ import random
 import re
 from io import BytesIO
 from pathlib import Path
-from typing import List
 
 import cv2
 import h5py
 import numpy as np
 from PIL import Image
+from evaldb.reader import EvalDBReader
 from flask import Flask, request
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI
-from ophys_etl.types import ExtractROI
 
 app = Flask(__name__)
+
+ARTIFACT_DB = EvalDBReader(
+    path=Path("/allen/aibs/informatics/segmentation_eval_dbs"
+              "/ssf_mouse_id_409828.db"))
 
 
 def get_random_experiment() -> str:
@@ -95,22 +98,26 @@ def get_random_roi():
 
 @app.route('/get_projection')
 def get_projection():
-    projection_type = request.args.get('type')
-    experiment_id = request.args.get('experiment_id')
+    projection_type = request.args['type']
+    experiment_id = request.args['experiment_id']
+    experiment_id = int(experiment_id)
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                    '/classifier_prototype_data')
-    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    projections = ARTIFACT_DB.get_backgrounds(
+        ophys_experiment_id=experiment_id)
 
+    # TODO add background type to artifact DB
     if projection_type == 'max':
-        with h5py.File(artifact_path, 'r') as f:
-            projection = f['max_projection'][:]
+        path = [x for x in projections if 'max_proj' in x.stem][0]
+    elif projection_type == 'average':
+        path = [x for x in projections if 'avg_proj' in x.stem][0]
+    elif projection_type == 'correlation':
+        path = [x for x in projections if 'correlation_proj' in
+                      x.stem][0]
     else:
         return 'bad projection type', 400
 
-    projection = np.stack([projection, projection, projection], axis=-1)
+    image = Image.open(path)
     buffered = BytesIO()
-    image = Image.fromarray(projection)
     image.save(buffered, format="png")
     img_str = base64.b64encode(buffered.getvalue())
     img_str = f'data:image/png;base64,{img_str.decode()}'

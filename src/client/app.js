@@ -22,6 +22,7 @@ class CellLabelingApp {
         this.roi = null;
         this.show_current_roi_outline_on_projection = false;
         this.show_all_roi_outlines = false;
+        this.projection_is_shown = false;
         this.roi_contours = null;
         this.addListeners();
     }
@@ -30,12 +31,16 @@ class CellLabelingApp {
         $('#projection_include_mask_outline').on('click', () => {
             this.show_current_roi_outline_on_projection = !this.show_current_roi_outline_on_projection;
             this.displayContoursOnProjection();
-        })
+        });
 
         $('#projection_include_surrounding_rois').on('click', () => {
             this.show_all_roi_outlines = !this.show_all_roi_outlines;
             this.displayContoursOnProjection();
-        })
+        });
+
+        $('#projection_type').on('change', () => {
+            this.displayProjection();            
+        });
     }
 
     async getRandomExperiment() {
@@ -121,24 +126,31 @@ class CellLabelingApp {
                 type: 'image'
             };
         
-            const layout = {
-                width: 512,
-                height: 512,
-                margin: {
-                    t: 30,
-                    l: 30,
-                    r: 30,
-                    b: 30
-                },
-                xaxis: {
-                    range: fovBounds['x']
-                },
-                yaxis: {
-                    range: fovBounds['y']
-                }
-            };
-                
-            Plotly.newPlot('projection', [trace1], layout);
+            if (this.projection_is_shown) {
+                const layout = document.getElementById('projection').layout;
+                Plotly.react('projection', [trace1], layout);
+            } else {
+                const layout = {
+                    width: 512,
+                    height: 512,
+                    margin: {
+                        t: 30,
+                        l: 30,
+                        r: 30,
+                        b: 30
+                    },
+                    xaxis: {
+                        range: fovBounds['x']
+                    },
+                    yaxis: {
+                        range: fovBounds['y']
+                    }
+                };
+
+                Plotly.newPlot('projection', [trace1], layout).then(() => {
+                    this.projection_is_shown = true;
+                });   
+            }
         })
     }    
 }
