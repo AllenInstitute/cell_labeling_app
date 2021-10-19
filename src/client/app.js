@@ -2,10 +2,11 @@ class CellLabelingApp {
     constructor() {
         this.experiment_id = null;
         this.roi = null;
-        this.show_current_roi_outline_on_projection = false;
+        this.show_current_roi_outline_on_projection = true;
         this.show_all_roi_outlines = false;
         this.projection_is_shown = false;
         this.roi_contours = null;
+        this.fovBounds = null;
 
         // Disable contour toggle checkboxes until contours have loaded
         $("#projection_include_mask_outline").attr("disabled", true);
@@ -30,21 +31,14 @@ class CellLabelingApp {
         });
     }
 
-    async getRandomExperiment() {
+    async getRandomRoiFromRandomExperiment() {
         return $.get('http://localhost:5000/get_random_roi', data => {
                 this.experiment_id = data['experiment_id'];
                 this.roi = data['roi'];
+                }).then(async () => {
+                    const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
+                    this.fovBounds = fovBounds;
                 })
-    }
-
-    async getContours() {
-        const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}`;
-        return $.get(url, data => {
-            this.roi_contours = data['contours'];
-
-            $("#projection_include_mask_outline").attr("disabled", false);
-            $("#projection_include_surrounding_rois").attr("disabled", false);
-        });
     }
 
     displayTrace() {
@@ -69,6 +63,17 @@ class CellLabelingApp {
     }
 
     async displayContoursOnProjection() {
+        if (this.roi_contours === null) {
+            const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}`;
+            await $.get(url, data => {
+                this.roi_contours = data['contours'];
+    
+                $("#projection_include_mask_outline").attr("disabled", false);
+                $("#projection_include_surrounding_rois").attr("disabled", false);
+            });
+        }
+
+
         let roi_contours = this.roi_contours;
         
         if (!this.show_all_roi_outlines) {
@@ -130,8 +135,6 @@ class CellLabelingApp {
         const projection_type = $('#projection_type').children("option:selected").val();
         const url = `http://localhost:5000/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
         return $.get(url, async data => {
-            const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
-
             const trace1 = {
                 source: data['projection'],
                 type: 'image'
@@ -151,25 +154,53 @@ class CellLabelingApp {
                         b: 30
                     },
                     xaxis: {
-                        range: fovBounds['x']
+                        range: this.fovBounds['x']
                     },
                     yaxis: {
-                        range: fovBounds['y']
+                        range: this.fovBounds['y']
                     }
                 };
 
                 Plotly.newPlot('projection', [trace1], layout).then(() => {
                     this.projection_is_shown = true;
-                });   
+                });
             }
+
+            this.displayContoursOnProjection(); 
         })
-    }    
+    }
+    
+    displayVideo() {
+        const url = `http://localhost:5000/get_video`;
+        const postData = {
+            experiment_id: this.experiment_id,
+            roi_id: this.roi['id'],
+            fovBounds: this.fovBounds
+        };
+        $.ajax({
+            xhrFields: {
+               responseType: 'blob' 
+            },
+            type: 'POST',
+            url: url,
+            data: JSON.stringify(postData)
+        }).then(response => {
+            const blob = new Blob([response], {type: "video\/mp4"});
+            const blobUrl = URL.createObjectURL(blob);
+            $('#movie').attr("src", blobUrl);
+        })
+
+    }
+
+    displayArtifacts() {
+        this.displayVideo();
+        this.displayProjection();
+        this.displayTrace();
+    }
 }
 
 $( document ).ready(async function() {
     const app = new CellLabelingApp();
-    await app.getRandomExperiment();
-    await app.displayProjection();
-    app.getContours();
-    app.displayTrace();
+    await app.getRandomRoiFromRandomExperiment();
+    app.displayArtifacts();
 });

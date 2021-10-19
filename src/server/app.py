@@ -1,9 +1,10 @@
-import base64
+import gzip
 import json
 import os
 import random
 import re
-from io import BytesIO
+import tempfile
+import time
 from pathlib import Path
 
 import cv2
@@ -11,9 +12,11 @@ import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
-from flask import Flask, request
+from flask import Flask, request, make_response, send_file
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
-    video_bounds_from_ROI
+    video_bounds_from_ROI, ThumbnailVideo
+
+from util import convert_pil_image_to_base64
 
 app = Flask(__name__)
 
@@ -117,10 +120,7 @@ def get_projection():
         return 'bad projection type', 400
 
     image = Image.open(path)
-    buffered = BytesIO()
-    image.save(buffered, format="png")
-    img_str = base64.b64encode(buffered.getvalue())
-    img_str = f'data:image/png;base64,{img_str.decode()}'
+    img_str = convert_pil_image_to_base64(img=image)
 
     return {
         'projection': img_str
@@ -146,6 +146,67 @@ def get_trace():
     return {
         'trace': trace
     }
+
+
+@app.route('/get_video', methods=['POST'])
+def get_video():
+    s = time.time()
+    request_data = request.get_json(force=True)
+    experiment_id = request_data['experiment_id']
+    roi_id = str(request_data['roi_id'])
+    fov_bounds = request_data['fovBounds']
+    timeframe = request_data.get('timeframe', None)
+
+    artifact_dir = Path('/allen/aibs/informatics/danielsf'
+                        '/classifier_prototype_data')
+    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+
+    def get_default_timeframe_from_trace():
+        with h5py.File(artifact_path, 'r') as f:
+            trace = (f['traces'][roi_id][()])
+
+        max_idx = trace.argmax()
+        start = max_idx - 300
+        end = max_idx + 300
+        return start, end
+
+    if not timeframe:
+        start, end = get_default_timeframe_from_trace()
+    else:
+        start, end = timeframe
+
+    with h5py.File(artifact_path, 'r') as f:
+        mov = f['video_data'][:]
+
+    fov_row_min, fov_row_max = fov_bounds['y'][1], fov_bounds['y'][0]
+    fov_col_min, fov_col_max = fov_bounds['x']
+
+    mov = mov[start:end, fov_row_min:fov_row_max, fov_col_min:fov_col_max]
+    # img_strs = []
+    # for frame in mov:
+    #     img = Image.fromarray(frame)
+    #     img_str = convert_pil_image_to_base64(img=img)
+    #     img_strs.append(img_str)
+    #
+    # data = {
+    #     'frames': img_strs
+    # }
+    #
+    # return data
+
+    with tempfile.NamedTemporaryFile(prefix='thumbnail_video_',
+                                     suffix='.mp4') as f:
+
+        _ = ThumbnailVideo(video_data=mov,
+                                   video_path=Path(f.name),
+                                   origin=None,
+                                   timesteps=None,
+                                   fps=31,
+                                   quality=5)
+        e = time.time()
+        print(e - s)
+        return send_file(path_or_file=f.name)
+
 
 
 @app.route('/get_fov_bounds', methods=['POST'])
@@ -184,4 +245,15 @@ def after_request(response):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--debug', default=False, action='store_true')
+
+    args = parser.parse_args()
+
+    if args.debug:
+        app.run(debug=True)
+    else:
+        from waitress import serve
+        serve(app, port=5000)
