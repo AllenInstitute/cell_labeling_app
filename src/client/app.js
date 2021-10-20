@@ -152,14 +152,15 @@ class CellLabelingApp {
         });
 
         Plotly.relayout('projection', {'shapes': shapes});
-
-        // Now load all contours in background
-        const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
-        $.get(url, data => {
-            this.roi_contours = data['contours'];
-            $("#projection_include_surrounding_rois").attr("disabled", false);
-        })
-
+        
+        if (this.roi_contours === null) {
+            // Now load all contours in background
+            const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
+            $.get(url, data => {
+                this.roi_contours = data['contours'];
+                $("#projection_include_surrounding_rois").attr("disabled", false);
+            });
+        }
     }
 
     async displayProjection() {
