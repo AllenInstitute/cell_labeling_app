@@ -3,7 +3,9 @@ class CellLabelingApp {
         this.experiment_id = null;
         this.roi = null;
         this.show_current_roi_outline_on_projection = true;
-        this.show_all_roi_outlines = false;
+        this.show_all_roi_outlines_on_projection = false;
+        this.show_current_roi_outline_on_movie = true;
+        this.show_all_roi_outlines_on_movie = false;
         this.projection_is_shown = false;
         this.roi_contours = null;
         this.fovBounds = null;
@@ -22,12 +24,22 @@ class CellLabelingApp {
         });
 
         $('#projection_include_surrounding_rois').on('click', () => {
-            this.show_all_roi_outlines = !this.show_all_roi_outlines;
+            this.show_all_roi_outlines_on_projection = !this.show_all_roi_outlines_on_projection;
             this.displayContoursOnProjection();
         });
 
         $('#projection_type').on('change', () => {
             this.displayProjection();            
+        });
+
+        $('#video_include_mask_outline').on('click', () => {
+            this.show_current_roi_outline_on_movie = !this.show_current_roi_outline_on_movie;
+            this.displayVideo();
+        });
+
+        $('#video_include_surrounding_rois').on('click', () => {
+            this.show_all_roi_outlines_on_movie = !this.show_all_roi_outlines_on_movie;
+            this.displayVideo();
         });
     }
 
@@ -76,7 +88,7 @@ class CellLabelingApp {
 
         let roi_contours = this.roi_contours;
         
-        if (!this.show_all_roi_outlines) {
+        if (!this.show_all_roi_outlines_on_projection) {
             roi_contours = roi_contours.filter(x => x['id'] == this.roi['id']);
         } 
         
@@ -171,11 +183,17 @@ class CellLabelingApp {
     }
     
     displayVideo() {
+        // Disable contour toggle checkboxes until movie has loaded
+        $('#video_include_mask_outline').attr("disabled", true);
+        $('#video_include_surrounding_rois').attr('disabled', true);
+
         const url = `http://localhost:5000/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.roi['id'],
-            fovBounds: this.fovBounds
+            fovBounds: this.fovBounds,
+            include_current_roi_mask: this.show_current_roi_outline_on_movie,
+            include_all_roi_masks: this.show_all_roi_outlines_on_movie
         };
         $.ajax({
             xhrFields: {
@@ -188,6 +206,9 @@ class CellLabelingApp {
             const blob = new Blob([response], {type: "video\/mp4"});
             const blobUrl = URL.createObjectURL(blob);
             $('#movie').attr("src", blobUrl);
+
+            $('#video_include_mask_outline').attr("disabled", false);
+            $('#video_include_surrounding_rois').attr('disabled', false);
         })
 
     }
