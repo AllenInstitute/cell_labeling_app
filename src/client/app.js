@@ -274,6 +274,19 @@ class CellLabelingApp {
     videoGoToTimesteps() {
         const trace = document.getElementById('trace');
         const timesteps = trace.layout.xaxis.range;
+
+        if (timesteps[1] - timesteps[0] > 3000) {
+            let alert = `
+                <div class="alert alert-danger fade show" role="alert" style="margin-top: 20px" id="alert-error">
+                    The selected timeframe is too large. Please limit to 3000 by selecting a timeframe from the trace
+                </div>`;
+            alert = $(alert);
+
+            alert.insertAfter($('#label_bar'));
+            
+            setTimeout(() => $('#alert-error').alert('close'), 10000);
+            return;
+        }
         this.videoTimeframe = timesteps;
         this.displayVideo();
     }
