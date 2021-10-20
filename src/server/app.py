@@ -54,9 +54,11 @@ def get_random_roi_from_experiment(experiment_id: str) -> dict:
 def get_roi_contours():
     experiment_id = request.args.get('experiment_id')
     current_roi_id = request.args.get('current_roi_id')
+    include_all_contours = request.args.get('include_all_contours') == 'true'
 
     all_contours = util.get_roi_contours(experiment_id=experiment_id,
-                                        current_roi_id=current_roi_id)
+                                         current_roi_id=current_roi_id,
+                                         include_all_rois=include_all_contours)
     return {
         'contours': all_contours
     }
@@ -184,7 +186,6 @@ def get_video():
         e = time.time()
         print(e - s)
         return send_file(path_or_file=f.name)
-
 
 
 @app.route('/get_fov_bounds', methods=['POST'])

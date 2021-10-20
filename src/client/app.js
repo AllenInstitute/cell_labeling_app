@@ -75,18 +75,16 @@ class CellLabelingApp {
     }
 
     async displayContoursOnProjection() {
-        if (this.roi_contours === null) {
-            const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}`;
+        let roi_contours = this.roi_contours;
+
+        if (roi_contours === null) {
+            const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
             await $.get(url, data => {
-                this.roi_contours = data['contours'];
+                roi_contours = data['contours'];
     
                 $("#projection_include_mask_outline").attr("disabled", false);
-                $("#projection_include_surrounding_rois").attr("disabled", false);
             });
         }
-
-
-        let roi_contours = this.roi_contours;
         
         if (!this.show_all_roi_outlines_on_projection) {
             roi_contours = roi_contours.filter(x => x['id'] == this.roi['id']);
@@ -140,6 +138,13 @@ class CellLabelingApp {
         });
 
         Plotly.relayout('projection', {'shapes': shapes});
+
+        // Now load all contours in background
+        const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
+        $.get(url, data => {
+            this.roi_contours = data['contours'];
+            $("#projection_include_surrounding_rois").attr("disabled", false);
+        })
 
     }
 
