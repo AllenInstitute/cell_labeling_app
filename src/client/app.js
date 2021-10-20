@@ -1,22 +1,5 @@
 class CellLabelingApp {
     constructor() {
-        this.experiment_id = null;
-        this.roi = null;
-        this.show_current_roi_outline_on_projection = true;
-        this.show_all_roi_outlines_on_projection = false;
-        this.show_current_roi_outline_on_movie = true;
-        this.show_all_roi_outlines_on_movie = false;
-        this.projection_is_shown = false;
-        this.is_trace_shown = false;
-        this.is_video_shown = false;
-        this.roi_contours = null;
-        this.fovBounds = null;
-        this.videoTimeframe = null;
-
-        // Disable contour toggle checkboxes until contours have loaded
-        $("#projection_include_mask_outline").attr("disabled", true);
-        $("#projection_include_surrounding_rois").attr("disabled", true);
-
         this.addListeners();
     }
 
@@ -48,6 +31,10 @@ class CellLabelingApp {
         $('button#trim_video_to_timeframe').on('click', () => {
             this.videoGoToTimesteps();
         });
+
+        $('button#submit_label').on('click', () => {
+            this.loadNewRoi();
+        })
     }
 
     async getRandomRoiFromRandomExperiment() {
@@ -92,11 +79,13 @@ class CellLabelingApp {
         let roi_contours = this.roi_contours;
 
         if (roi_contours === null) {
+            $("#projection_include_mask_outline").attr("disabled", true);
             const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
             await $.get(url, data => {
                 roi_contours = data['contours'];
     
                 $("#projection_include_mask_outline").attr("disabled", false);
+                $("#projection_type").attr("disabled", false);
             });
         }
         
@@ -154,16 +143,25 @@ class CellLabelingApp {
         Plotly.relayout('projection', {'shapes': shapes});
         
         if (this.roi_contours === null) {
+            $("#projection_include_surrounding_rois").attr("disabled", true);
+
             // Now load all contours in background
             const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
-            $.get(url, data => {
+            return $.get(url, data => {
                 this.roi_contours = data['contours'];
                 $("#projection_include_surrounding_rois").attr("disabled", false);
             });
         }
+
+        return;
     }
 
     async displayProjection() {
+        // Disable projection settings until loaded
+        $('#projection_type').attr('disabled', true);
+        $("#projection_include_mask_outline").attr("disabled", true);
+        $("#projection_include_surrounding_rois").attr("disabled", true);
+
         const projection_type = $('#projection_type').children("option:selected").val();
         const url = `http://localhost:5000/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
         return $.get(url, async data => {
@@ -197,8 +195,20 @@ class CellLabelingApp {
                     this.projection_is_shown = true;
                 });
             }
+            
+            if (this.roi_contours === null) {
 
-            this.toggleContoursOnProjection(); 
+            }
+            $('#projection_type').attr('disabled', false);
+            $("#projection_include_mask_outline").attr("disabled", false);
+
+            if (this.roi_contours !== null) {
+                $("#projection_include_surrounding_rois").attr("disabled", false);
+            }
+
+            this.toggleContoursOnProjection().then(() => {
+                $("#projection_include_surrounding_rois").attr("disabled", false);
+            })
         })
     }
     
@@ -273,10 +283,30 @@ class CellLabelingApp {
         this.displayProjection();
         this.displayTrace();
     }
+
+    initialize() {
+        this.show_current_roi_outline_on_projection = $('#projection_include_mask_outline').is(':checked');
+        this.show_all_roi_outlines_on_projection = $('#projection_include_surrounding_rois').is(':checked');
+        this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
+        this.show_all_roi_outlines_on_movie = $('#video_include_surrounding_rois').is(':checked');
+        this.is_trace_shown = false;
+        this.is_video_shown = false;
+        this.roi_contours = null;
+        this.fovBounds = null;
+        this.videoTimeframe = null;
+        this.experiment_id = null;
+        this.projection_is_shown = false;
+        this.roi = null;
+    }
+
+    async loadNewRoi() {
+        this.initialize();
+        await this.getRandomRoiFromRandomExperiment();
+        this.displayArtifacts();
+    }
 }
 
 $( document ).ready(async function() {
     const app = new CellLabelingApp();
-    await app.getRandomRoiFromRandomExperiment();
-    app.displayArtifacts();
+    app.loadNewRoi();
 });
