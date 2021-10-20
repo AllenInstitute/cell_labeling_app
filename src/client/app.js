@@ -11,6 +11,7 @@ class CellLabelingApp {
         this.is_video_shown = false;
         this.roi_contours = null;
         this.fovBounds = null;
+        this.videoTimeframe = null;
 
         // Disable contour toggle checkboxes until contours have loaded
         $("#projection_include_mask_outline").attr("disabled", true);
@@ -200,7 +201,7 @@ class CellLabelingApp {
         })
     }
     
-    async displayVideo(timeframe = null) {
+    async displayVideo() {
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
         $('#video_include_surrounding_rois').attr('disabled', true);
@@ -213,15 +214,17 @@ class CellLabelingApp {
 
         this.is_video_shown = false;
 
-        if (timeframe === null) {
+        let videoTimeframe = this.videoTimeframe;
+
+        if (videoTimeframe === null) {
             await fetch(`http://localhost:5000/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
             .then(data => data.json())
             .then(data => {
-                timeframe = data['timeframe'];
+                videoTimeframe = data['timeframe'];
             });
         }
 
-        timeframe = [parseInt(timeframe[0]), parseInt(timeframe[1])]
+        this.videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
 
         const url = `http://localhost:5000/get_video`;
         const postData = {
@@ -230,7 +233,7 @@ class CellLabelingApp {
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
-            timeframe: timeframe
+            timeframe: this.videoTimeframe
         };
         $.ajax({
             xhrFields: {
@@ -251,7 +254,7 @@ class CellLabelingApp {
                 $('button#trim_video_to_timeframe').attr('disabled', false);
             }
 
-            $('#timestep_display').text(`Timesteps: ${timeframe[0]} - ${timeframe[1]}`);
+            $('#timestep_display').text(`Timesteps: ${this.videoTimeframe[0]} - ${this.videoTimeframe[1]}`);
 
             this.is_video_shown = true;
         })
@@ -260,7 +263,8 @@ class CellLabelingApp {
     videoGoToTimesteps() {
         const trace = document.getElementById('trace');
         const timesteps = trace.layout.xaxis.range;
-        this.displayVideo(timesteps);
+        this.videoTimeframe = timesteps;
+        this.displayVideo();
     }
 
     displayArtifacts() {
