@@ -7,6 +7,8 @@ class CellLabelingApp {
         this.show_current_roi_outline_on_movie = true;
         this.show_all_roi_outlines_on_movie = false;
         this.projection_is_shown = false;
+        this.is_trace_shown = false;
+        this.is_video_shown = false;
         this.roi_contours = null;
         this.fovBounds = null;
 
@@ -20,12 +22,12 @@ class CellLabelingApp {
     addListeners() {
         $('#projection_include_mask_outline').on('click', () => {
             this.show_current_roi_outline_on_projection = !this.show_current_roi_outline_on_projection;
-            this.displayContoursOnProjection();
+            this.toggleContoursOnProjection();
         });
 
         $('#projection_include_surrounding_rois').on('click', () => {
             this.show_all_roi_outlines_on_projection = !this.show_all_roi_outlines_on_projection;
-            this.displayContoursOnProjection();
+            this.toggleContoursOnProjection();
         });
 
         $('#projection_type').on('change', () => {
@@ -40,6 +42,10 @@ class CellLabelingApp {
         $('#video_include_surrounding_rois').on('click', () => {
             this.show_all_roi_outlines_on_movie = !this.show_all_roi_outlines_on_movie;
             this.displayVideo();
+        });
+
+        $('button#trim_video_to_timeframe').on('click', () => {
+            this.videoGoToTimesteps();
         });
     }
 
@@ -71,10 +77,17 @@ class CellLabelingApp {
             }
 
             Plotly.newPlot('trace', [trace], layout);
+
+            this.is_trace_shown = true;
+
+            // Enable this button if not already enabled
+            if (this.is_video_shown) {
+                $('button#trim_video_to_timeframe').attr('disabled', false);
+            }
         });
     }
 
-    async displayContoursOnProjection() {
+    async toggleContoursOnProjection() {
         let roi_contours = this.roi_contours;
 
         if (roi_contours === null) {
@@ -183,11 +196,11 @@ class CellLabelingApp {
                 });
             }
 
-            this.displayContoursOnProjection(); 
+            this.toggleContoursOnProjection(); 
         })
     }
     
-    async displayVideo() {
+    async displayVideo(timeframe = null) {
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
         $('#video_include_surrounding_rois').attr('disabled', true);
@@ -195,13 +208,20 @@ class CellLabelingApp {
         // Reset timestep display text
         $('#timestep_display').text('');
 
-        let timeframe;
+        // Disable goto timesteps
+        $('button#trim_video_to_timeframe').attr('disabled', true);
 
-        await fetch(`http://localhost:5000/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
+        this.is_video_shown = false;
+
+        if (timeframe === null) {
+            await fetch(`http://localhost:5000/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
             .then(data => data.json())
             .then(data => {
                 timeframe = data['timeframe'];
             });
+        }
+
+        timeframe = [parseInt(timeframe[0]), parseInt(timeframe[1])]
 
         const url = `http://localhost:5000/get_video`;
         const postData = {
@@ -227,9 +247,20 @@ class CellLabelingApp {
             $('#video_include_mask_outline').attr("disabled", false);
             $('#video_include_surrounding_rois').attr('disabled', false);
 
-            $('#timestep_display').text(`Timesteps: ${timeframe[0]} - ${timeframe[1]}`);
-        })
+            if (this.is_trace_shown) {
+                $('button#trim_video_to_timeframe').attr('disabled', false);
+            }
 
+            $('#timestep_display').text(`Timesteps: ${timeframe[0]} - ${timeframe[1]}`);
+
+            this.is_video_shown = true;
+        })
+    }
+
+    videoGoToTimesteps() {
+        const trace = document.getElementById('trace');
+        const timesteps = trace.layout.xaxis.range;
+        this.displayVideo(timesteps);
     }
 
     displayArtifacts() {

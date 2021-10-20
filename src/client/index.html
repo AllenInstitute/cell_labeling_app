@@ -43,8 +43,8 @@
     </nav>
     <div class="row">
         <div class="col">
-            <div id="video_container">
-                <video controls id="movie" width="512" height="512"></video>
+            <div id="video_container" style="margin-top: 30px;">
+                <video controls id="movie" width="452" height="452"></video>
                 <div id="video_settings">
                     <h4 id="timestep_display"></h4>
                     <div class="form-check form-check-inline mt-4">
@@ -60,6 +60,11 @@
                         <label class="form-check-label" for="video_include_surrounding_rois">
                             include surrounding ROIs
                         </label>
+                    </div>
+                    <div class="mt-4">
+                        <button class="btn btn-light" id="trim_video_to_timeframe">
+                            Go to trace timesteps
+                        </button>
                     </div>
                 </div>
             </div>
@@ -103,7 +108,7 @@
         </div>
     </div>
     <div class="row">
-        <div class="col col">
+        <div class="col">
             <div id="trace_container">
                 <div id="trace"></div>
             </div>
