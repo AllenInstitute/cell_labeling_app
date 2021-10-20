@@ -57,3 +57,12 @@ def get_roi_contours(experiment_id: str, current_roi_id: str,
         })
     return all_contours
 
+
+def get_trace(experiment_id: str, roi_id: str):
+    artifact_dir = Path('/allen/aibs/informatics/danielsf'
+                        '/classifier_prototype_data')
+    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+
+    with h5py.File(artifact_path, 'r') as f:
+        trace = (f['traces'][roi_id][()])
+    return trace

@@ -107,11 +107,7 @@ def get_trace():
     experiment_id = request.args['experiment_id']
     roi_id = request.args['roi_id']
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                    '/classifier_prototype_data')
-    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
-    with h5py.File(artifact_path, 'r') as f:
-        trace = (f['traces'][roi_id][()])
+    trace = util.get_trace(experiment_id=experiment_id, roi_id=roi_id)
 
     # Trace seems to decrease to 0 at the end which makes visualization worse
     # Trim to last nonzero index
@@ -132,25 +128,11 @@ def get_video():
     fov_bounds = request_data['fovBounds']
     include_current_roi_mask = request_data['include_current_roi_mask']
     include_all_roi_masks = request_data['include_all_roi_masks']
-    timeframe = request_data.get('timeframe', None)
+    start, end = request_data['timeframe']
 
     artifact_dir = Path('/allen/aibs/informatics/danielsf'
                         '/classifier_prototype_data')
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
-
-    def get_default_timeframe_from_trace():
-        with h5py.File(artifact_path, 'r') as f:
-            trace = (f['traces'][roi_id][()])
-
-        max_idx = trace.argmax()
-        start = max_idx - 300
-        end = max_idx + 300
-        return start, end
-
-    if not timeframe:
-        start, end = get_default_timeframe_from_trace()
-    else:
-        start, end = timeframe
 
     with h5py.File(artifact_path, 'r') as f:
         mov = f['video_data'][:]
@@ -186,6 +168,21 @@ def get_video():
         e = time.time()
         print(e - s)
         return send_file(path_or_file=f.name)
+
+
+@app.route('/get_default_video_timeframe')
+def get_default_video_timeframe():
+    experiment_id = request.args['experiment_id']
+    roi_id = request.args['roi_id']
+
+    trace = util.get_trace(experiment_id=experiment_id, roi_id=roi_id)
+
+    max_idx = trace.argmax()
+    start = float(max_idx - 300)
+    end = float(max_idx + 300)
+    return {
+        'timeframe': (start, end)
+    }
 
 
 @app.route('/get_fov_bounds', methods=['POST'])

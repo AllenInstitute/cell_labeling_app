@@ -187,10 +187,21 @@ class CellLabelingApp {
         })
     }
     
-    displayVideo() {
+    async displayVideo() {
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
         $('#video_include_surrounding_rois').attr('disabled', true);
+        
+        // Reset timestep display text
+        $('#timestep_display').text('');
+
+        let timeframe;
+
+        await fetch(`http://localhost:5000/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
+            .then(data => data.json())
+            .then(data => {
+                timeframe = data['timeframe'];
+            });
 
         const url = `http://localhost:5000/get_video`;
         const postData = {
@@ -198,7 +209,8 @@ class CellLabelingApp {
             roi_id: this.roi['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
-            include_all_roi_masks: this.show_all_roi_outlines_on_movie
+            include_all_roi_masks: this.show_all_roi_outlines_on_movie,
+            timeframe: timeframe
         };
         $.ajax({
             xhrFields: {
@@ -214,6 +226,8 @@ class CellLabelingApp {
 
             $('#video_include_mask_outline').attr("disabled", false);
             $('#video_include_surrounding_rois').attr('disabled', false);
+
+            $('#timestep_display').text(`Timesteps: ${timeframe[0]} - ${timeframe[1]}`);
         })
 
     }
