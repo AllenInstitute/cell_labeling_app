@@ -28,4 +28,4 @@ Use the plot tools in the upper right to pan, zoom, etc.
 The default video timeframe is `argmax(trace magnitude) +- 300 timesteps`
 To change this timeframe, select a timeframe from the trace and then click the "Go to trace timesteps" button.
 
-
+The video takes about 30 seconds to load.
