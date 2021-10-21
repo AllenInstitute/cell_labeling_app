@@ -1,9 +1,8 @@
 import datetime
 import json
-import os
 import random
-import re
 import time
+from operator import concat
 from pathlib import Path
 from typing import Tuple, Dict, Optional
 
@@ -17,7 +16,8 @@ from ophys_etl.modules.segmentation.qc_utils.video_generator import (
     VideoGenerator)
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, or_, text
+from sqlalchemy.sql import functions
 
 import util
 
@@ -34,17 +34,17 @@ ARTIFACT_DB = EvalDBReader(
 
 def get_random_roi_from_experiment() -> Tuple[Optional[str], Optional[Dict]]:
     user_has_labeled = db.session\
-        .query(JobRois.experiment_id, JobRois.roi_id)\
+        .query(JobRois.experiment_id.concat('_').concat(JobRois.roi_id))\
         .join(UserLabel, UserLabel.job_roi_id == JobRois.id)\
-        .filter(JobRois.job_id == JOB_ID).all()
+        .filter(JobRois.job_id == JOB_ID, UserLabel.user_id == USER_ID).all()
 
     next_roi_candidates = db.session\
         .query(JobRois.experiment_id, JobRois.roi_id)
 
-    for exp_id, roi_id in user_has_labeled:
-        next_roi_candidates = next_roi_candidates\
-            .filter(JobRois.experiment_id != exp_id,
-                    JobRois.roi_id != roi_id)
+    for roi in user_has_labeled:
+        roi = roi[0]
+        next_roi_candidates = next_roi_candidates.filter(
+            JobRois.experiment_id.concat('_').concat(JobRois.roi_id) != roi)
 
     next_roi_candidates = next_roi_candidates.all()
 

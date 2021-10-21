@@ -8,7 +8,7 @@ def create_db():
 
 
 def populate_users():
-    users = ('adam',)
+    users = ('adam.amster', 'scott.daniel', 'wayne.wakeman', 'michael.wang')
     for user in users:
         user = User(user_id=user)
         db.session.add(user)

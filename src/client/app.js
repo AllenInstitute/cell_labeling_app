@@ -269,7 +269,7 @@ class CellLabelingApp {
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
             timeframe: this.videoTimeframe
         };
-        $.ajax({
+        return $.ajax({
             xhrFields: {
                responseType: 'blob' 
             },
@@ -315,9 +315,11 @@ class CellLabelingApp {
     }
 
     displayArtifacts() {
-        this.displayVideo();
-        this.displayProjection();
-        this.displayTrace();
+        return Promise.all([
+            this.displayVideo(),
+            this.displayProjection(),
+            this.displayTrace()
+        ]);
     }
 
     initialize() {
@@ -339,9 +341,25 @@ class CellLabelingApp {
 
     async loadNewRoi() {
         this.initialize();
-        const roi = await this.getRandomRoiFromRandomExperiment();
+        $('#loading_text').css('display', 'inline');
+
+        const roi = await this.getRandomRoiFromRandomExperiment().catch(() => {
+            $('#loading_text').hide();
+
+            let alert = `
+                <div class="alert alert-danger fade show" role="alert" style="margin-top: 20px" id="alert-error">
+                    Error loading ROI
+                </div>`;
+            alert = $(alert);
+
+            alert.insertAfter($('#label_bar'));
+            
+            setTimeout(() => $('#alert-error').alert('close'), 10000);
+        });
         if (roi['roi'] !== null) {
-            this.displayArtifacts();
+            this.displayArtifacts().then(() => {
+                $('#loading_text').hide();
+            })
         }
     }
 
@@ -353,7 +371,10 @@ class CellLabelingApp {
             roi_id: this.roi['id'],
             label: label
         };
-        return $.post(url, JSON.stringify(data));
+        return $.post(url, JSON.stringify(data)).then(() => {
+            $('#label_cell').prop('checked', false);
+            $('#label_not_cell').prop('checked', false);
+        })
     }
 }
 
