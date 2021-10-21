@@ -8,7 +8,7 @@
 cd cell_labeling_app
 conda env create -f environment.yml
 conda activate cell_labeling_app
-python src/server/app.py --user_id <FirstName.LastName>
+python src/server/app.py --user_id <FirstName.LastName> (in lower case)
 ```
 This step launches a web server listening on port 5000
 
