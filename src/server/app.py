@@ -1,4 +1,3 @@
-import gzip
 import json
 import os
 import random
@@ -13,6 +12,8 @@ import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
 from flask import Flask, request, send_file
+from ophys_etl.modules.segmentation.qc_utils.video_generator import (
+    VideoGenerator)
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI, ThumbnailVideo
 
@@ -124,10 +125,10 @@ def get_video():
     s = time.time()
     request_data = request.get_json(force=True)
     experiment_id = request_data['experiment_id']
-    roi_id = str(request_data['roi_id'])
-    fov_bounds = request_data['fovBounds']
+    roi_id = int(request_data['roi_id'])
     include_current_roi_mask = request_data['include_current_roi_mask']
     include_all_roi_masks = request_data['include_all_roi_masks']
+    padding = int(request_data.get('padding', 32))
     start, end = request_data['timeframe']
 
     artifact_dir = Path('/allen/aibs/informatics/danielsf'
@@ -135,39 +136,25 @@ def get_video():
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
 
     with h5py.File(artifact_path, 'r') as f:
-        mov = f['video_data'][:]
+        video_generator = VideoGenerator(video_data=f['video_data'][()])
+        rois = json.loads(f['rois'][()])
+        roi_color_map = json.loads(f['roi_color_map'][()])
 
-    if include_all_roi_masks or include_current_roi_mask:
-        contours = util.get_roi_contours(
-            experiment_id=experiment_id, current_roi_id=roi_id,
-            include_all_rois=include_all_roi_masks,
-            reshape_contours_to_list=False)
+    this_roi = rois[roi_id]
+    timesteps = np.arange(start, end)
 
-        # convert to 3 channels so that colored masks can be drawn on
-        mov = np.stack([mov, mov, mov], axis=-1)
+    roi_color_map[roi_id] = (255, 0, 0) if include_current_roi_mask else None
+    roi_list = rois if include_all_roi_masks else None
 
-        for frame in mov:
-            for contour in contours:
-                cv2.drawContours(frame, contour['contour'],
-                                 -1, contour['color'], 1)
-
-    fov_row_min, fov_row_max = fov_bounds['y'][1], fov_bounds['y'][0]
-    fov_col_min, fov_col_max = fov_bounds['x']
-
-    mov = mov[start:end, fov_row_min:fov_row_max, fov_col_min:fov_col_max]
-
-    with tempfile.NamedTemporaryFile(prefix='thumbnail_video_',
-                                     suffix='.mp4') as f:
-
-        _ = ThumbnailVideo(video_data=mov,
-                                   video_path=Path(f.name),
-                                   origin=None,
-                                   timesteps=None,
-                                   fps=31,
-                                   quality=5)
-        e = time.time()
-        print(e - s)
-        return send_file(path_or_file=f.name)
+    video = video_generator.get_thumbnail_video_from_roi(
+        this_roi,
+        padding=padding,
+        quality=9,
+        timesteps=timesteps,
+        fps=31,
+        other_roi=roi_list,
+        roi_color=roi_color_map)
+    return send_file(path_or_file=video.video_path)
 
 
 @app.route('/get_default_video_timeframe')
@@ -229,7 +216,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.debug:
-        app.run(debug=True)
+        app.run(debug=False)
     else:
         from waitress import serve
         serve(app, port=5000)
