@@ -8,7 +8,7 @@
 cd cell_labeling_app
 conda env create -f environment.yml
 conda activate cell_labeling_app
-python src/server/app.py --user_id <FirstName.LastName>
+python src/server/app.py --user_id <FirstName.LastName> (in lower case)
 ```
 This step launches a web server listening on port 5000
 
@@ -18,9 +18,11 @@ On linux the command is
 ssh -L 5000:localhost:5000 -N -f -l <username> <domain name of computer in step (1)>
 ```
 
-4. Open the file `client/index.html` in a browser
+4. Open the file `src/client/index.html` in a browser
 
 ## Notes
+
+An ROI that you have not labeled before is randomly sampled until there are no more ROIs left to label.
 
 The projection plot starts out centered on the ROI. Double click the plot to zoom out the entire projection, and double click again to return to the original view.
 Use the plot tools in the upper right to pan, zoom, etc.
