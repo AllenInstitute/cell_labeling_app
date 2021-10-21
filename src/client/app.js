@@ -32,19 +32,42 @@ class CellLabelingApp {
             this.videoGoToTimesteps();
         });
 
-        $('button#submit_label').on('click', () => {
+        $('button#submit_label').on('click', async () => {
+            await this.submitLabel();
             this.loadNewRoi();
-        })
+        });
+
+        $('#label_cell').on('click', () => {
+            $('button#submit_label').attr('disabled', false);
+        });
+
+        $('#label_not_cell').on('click', () => {
+            $('button#submit_label').attr('disabled', false);
+        });
     }
 
     async getRandomRoiFromRandomExperiment() {
-        return $.get('http://localhost:5000/get_random_roi', data => {
+        const roi = await $.get('http://localhost:5000/get_random_roi', data => {
+            let roi;
+            if (data['roi'] === null) {
+                // No more rois to label
+                $('#doneModal').modal('show');
+                roi = {experiment_id: null, roi: null};
+            } else {
                 this.experiment_id = data['experiment_id'];
                 this.roi = data['roi'];
-                }).then(async () => {
-                    const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
-                    this.fovBounds = fovBounds;
-                })
+                roi = this.roi;
+            }
+            return roi;
+        });
+        
+        if (roi['roi'] !== null) {
+            const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
+            this.fovBounds = fovBounds;
+        }
+
+        return roi;
+
     }
 
     displayTrace() {
@@ -310,12 +333,27 @@ class CellLabelingApp {
         this.experiment_id = null;
         this.projection_is_shown = false;
         this.roi = null;
+
+        $('button#submit_label').attr('disabled', true);
     }
 
     async loadNewRoi() {
         this.initialize();
-        await this.getRandomRoiFromRandomExperiment();
-        this.displayArtifacts();
+        const roi = await this.getRandomRoiFromRandomExperiment();
+        if (roi['roi'] !== null) {
+            this.displayArtifacts();
+        }
+    }
+
+    submitLabel() {
+        const url = `http://localhost:5000/add_label`;
+        const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
+        const data = {
+            experiment_id: this.experiment_id,
+            roi_id: this.roi['id'],
+            label: label
+        };
+        return $.post(url, JSON.stringify(data));
     }
 }
 

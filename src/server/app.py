@@ -1,54 +1,78 @@
+import datetime
 import json
 import os
 import random
 import re
-import tempfile
 import time
 from pathlib import Path
+from typing import Tuple, Dict, Optional
 
-import cv2
 import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
 from flask import Flask, request, send_file
+from flask_sqlalchemy import SQLAlchemy
 from ophys_etl.modules.segmentation.qc_utils.video_generator import (
     VideoGenerator)
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
-    video_bounds_from_ROI, ThumbnailVideo
+    video_bounds_from_ROI
+from sqlalchemy import desc, and_
 
 import util
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = \
+    'sqlite:////allen/aibs/informatics/aamster/cell_labeling_app.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 ARTIFACT_DB = EvalDBReader(
     path=Path("/allen/aibs/informatics/segmentation_eval_dbs"
               "/ssf_mouse_id_409828.db"))
 
 
-def get_random_experiment() -> str:
-    artifact_dir = '/allen/aibs/informatics/danielsf/classifier_prototype_data'
-    file_list = os.listdir(artifact_dir)
-    exp_ids = [re.match('\d+', x).group() for x in file_list]
-    exp_id = random.choice(exp_ids)
-    return exp_id
+def get_random_roi_from_experiment() -> Tuple[Optional[str], Optional[Dict]]:
+    user_has_labeled = db.session\
+        .query(JobRois.experiment_id, JobRois.roi_id)\
+        .join(UserLabel, UserLabel.job_roi_id == JobRois.id)\
+        .filter(JobRois.job_id == JOB_ID).all()
 
+    next_roi_candidates = db.session\
+        .query(JobRois.experiment_id, JobRois.roi_id)
 
-def get_random_roi_from_experiment(experiment_id: str) -> dict:
+    for exp_id, roi_id in user_has_labeled:
+        next_roi_candidates = next_roi_candidates\
+            .filter(JobRois.experiment_id != exp_id,
+                    JobRois.roi_id != roi_id)
+
+    next_roi_candidates = next_roi_candidates.all()
+
+    if not next_roi_candidates:
+        return None, None
+
+    next_roi = random.choice(next_roi_candidates)
+
+    experiment_id, roi_id = next_roi
+
     artifact_dir = Path('/allen/aibs/informatics/danielsf'
                     '/classifier_prototype_data')
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
     with h5py.File(artifact_path, 'r') as f:
         rois = json.loads((f['rois'][()]))
-    roi_idx = random.choice(range(len(rois)))
 
-    return {
-        'id': rois[roi_idx]['id'],
-        'x': rois[roi_idx]['x'],
-        'y': rois[roi_idx]['y'],
-        'width': rois[roi_idx]['width'],
-        'height': rois[roi_idx]['height']
+    roi = [x for x in rois if x['id'] == roi_id][0]
+
+    roi = {
+        'experiment_id': experiment_id,
+        'id': roi['id'],
+        'x': roi['x'],
+        'y': roi['y'],
+        'width': roi['width'],
+        'height': roi['height']
     }
+
+    return experiment_id, roi
 
 
 @app.route('/get_roi_contours')
@@ -67,10 +91,9 @@ def get_roi_contours():
 
 @app.route("/get_random_roi")
 def get_random_roi():
-    exp_id = get_random_experiment()
-    roi = get_random_roi_from_experiment(experiment_id=exp_id)
+    experiment_id, roi = get_random_roi_from_experiment()
     return {
-        'experiment_id': exp_id,
+        'experiment_id': experiment_id,
         'roi': roi
     }
 
@@ -202,6 +225,22 @@ def get_fov_bounds():
     }
 
 
+@app.route('/add_label', methods=['POST'])
+def add_label():
+    data = request.get_json(force=True)
+    roi_id = db.session.query(JobRois.id).filter(
+        JobRois.experiment_id == data['experiment_id'],
+        JobRois.roi_id == int(data['roi_id']))\
+        .first()
+    roi_id = roi_id[0]
+    user_label = UserLabel(user_id=USER_ID, job_roi_id=roi_id,
+                           label=data['label'])
+    db.session.add(user_label)
+    db.session.commit()
+
+    return 'success'
+
+
 @app.after_request
 def after_request(response):
     header = response.headers
@@ -209,16 +248,63 @@ def after_request(response):
     return response
 
 
+###################
+# Database schemas
+###################
+
+
+class LabelingJob(db.Model):
+    job_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+
+class JobRois(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    job_id = db.Column(db.Integer, db.ForeignKey(LabelingJob.job_id))
+    experiment_id = db.Column(db.String, nullable=False)
+    roi_id = db.Column(db.Integer, nullable=False)
+
+    def __repr__(self):
+        return f'id: {self.id}, job_id: {self.job_id}, experiment_id: ' \
+               f'{self.experiment_id}, roi_id: {self.roi_id}'
+
+
+class User(db.Model):
+    user_id = db.Column(db.String, primary_key=True)
+
+
+class UserLabel(db.Model):
+    user_id = db.Column(db.String, db.ForeignKey(User.user_id),
+                        primary_key=True)
+    job_roi_id = db.Column(db.Integer, db.ForeignKey(JobRois.id),
+                           primary_key=True)
+    label = db.Column(db.String, nullable=False)
+
+
+def _validate_user(user_id: str):
+    all_users = db.session.query(User.user_id).all()
+    all_user_ids = [x.user_id for x in all_users]
+    if user_id not in all_user_ids:
+        raise RuntimeError(f'Bad user id. Please choose one of these user '
+                           f'ids: {all_user_ids}')
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--user_id', required=True)
 
     args = parser.parse_args()
 
-    if args.debug:
-        app.run(debug=False)
-    else:
-        from waitress import serve
-        serve(app, port=5000)
+    _validate_user(user_id=args.user_id)
+
+    # Set job id as current job id
+    JOB_ID = db.session.query(LabelingJob.job_id).order_by(desc(
+        LabelingJob.date)).scalar()
+
+    # Note that this is hacky and should be stored in a session instead of
+    # being given from command line. Doing this for simplicity.
+    USER_ID = args.user_id
+
+    app.run(debug=False)
