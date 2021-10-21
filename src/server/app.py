@@ -139,6 +139,8 @@ def get_video():
         video_generator = VideoGenerator(video_data=f['video_data'][()])
         rois = json.loads(f['rois'][()])
         roi_color_map = json.loads(f['roi_color_map'][()])
+        roi_color_map = {int(roi_id): tuple(roi_color_map[roi_id])
+                         for roi_id in roi_color_map}
 
     this_roi = rois[roi_id]
     timesteps = np.arange(start, end)
