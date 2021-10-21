@@ -22,6 +22,8 @@ ssh -L 5000:localhost:5000 -N -f -l <username> <domain name of computer in step 
 
 ## Notes
 
+An ROI that you have not labeled before is randomly sampled until there are no more ROIs left to label.
+
 The projection plot starts out centered on the ROI. Double click the plot to zoom out the entire projection, and double click again to return to the original view.
 Use the plot tools in the upper right to pan, zoom, etc.
 
