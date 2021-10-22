@@ -18,7 +18,7 @@ On linux the command is
 ssh -L 5000:localhost:5000 -N -f -l <username> <domain name of computer in step (1)>
 ```
 
-4. Open the file `src/client/index.html` in a browser
+4. Go to localhost:5000 in a browser
 
 ## Notes
 
