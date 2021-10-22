@@ -2,7 +2,6 @@ import datetime
 import json
 import random
 import time
-from operator import concat
 from pathlib import Path
 from typing import Tuple, Dict, Optional
 
@@ -10,18 +9,20 @@ import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, render_template
 from flask_sqlalchemy import SQLAlchemy
 from ophys_etl.modules.segmentation.qc_utils.video_generator import (
     VideoGenerator)
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI
-from sqlalchemy import desc, and_, or_, text
-from sqlalchemy.sql import functions
+from sqlalchemy import desc
 
 import util
 
-app = Flask(__name__)
+template_dir = (Path(__file__).parent.parent / 'client').resolve()
+static_dir = template_dir
+app = Flask(__name__, template_folder=str(template_dir),
+            static_folder=static_dir)
 app.config['SQLALCHEMY_DATABASE_URI'] = \
     'sqlite:////allen/aibs/informatics/aamster/cell_labeling_app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -73,6 +74,11 @@ def get_random_roi_from_experiment() -> Tuple[Optional[str], Optional[Dict]]:
     }
 
     return experiment_id, roi
+
+
+@app.route('/')
+def index():
+    return render_template('index.html', template_dir=str(template_dir))
 
 
 @app.route('/get_roi_contours')
