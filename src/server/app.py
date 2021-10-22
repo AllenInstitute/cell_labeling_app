@@ -78,7 +78,7 @@ def get_random_roi_from_experiment() -> Tuple[Optional[str], Optional[Dict]]:
 
 @app.route('/')
 def index():
-    return render_template('index.html', template_dir=str(template_dir))
+    return render_template('index.html')
 
 
 @app.route('/get_roi_contours')
