@@ -1,13 +1,9 @@
 from sqlalchemy import desc
 
-from app import db, LabelingJob, JobRois, User
+from src.server.database.schemas import User, LabelingJob, JobRois
 
 
-def create_db():
-    db.create_all()
-
-
-def populate_users():
+def populate_users(db):
     users = ('adam.amster', 'scott.daniel', 'wayne.wakeman', 'michael.wang')
     for user in users:
         user = User(user_id=user)
@@ -15,7 +11,7 @@ def populate_users():
     db.session.commit()
 
 
-def populate_labeling_job():
+def populate_labeling_job(db):
     job = LabelingJob()
     db.session.add(job)
 
@@ -40,9 +36,3 @@ def populate_labeling_job():
     db.session.commit()
 
     print(JobRois.query.all())
-
-
-if __name__ == '__main__':
-    create_db()
-    populate_users()
-    populate_labeling_job()
