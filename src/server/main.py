@@ -2,21 +2,19 @@ from pathlib import Path
 
 from flask import Flask
 
-from src.server.config.config import CELL_LABELING_APP_DB
 from src.server.database.database import db
 from src.server.endpoints.endpoints import api
 from src.server.database.populate_db import populate_users, \
     populate_labeling_job
 
 
-def create_app():
+def create_app(config_file: Path):
     template_dir = (Path(__file__).parent.parent / 'client').resolve()
     static_dir = template_dir
     app = Flask(__name__, static_folder=static_dir,
                           template_folder=str(template_dir))
     app.register_blueprint(api)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{CELL_LABELING_APP_DB}'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config.from_pyfile(filename=str(config_file))
     db.init_app(app)
     app.register_blueprint(api)
     return app
@@ -30,7 +28,21 @@ def setup_database(app: Flask):
 
 
 if __name__ == '__main__':
-    app = create_app()
-    if not Path(CELL_LABELING_APP_DB).is_file():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_file', help='Path to config file',
+                        required=True)
+    args = parser.parse_args()
+
+    config_file = Path(args.config_file)
+    if not config_file.exists():
+        raise RuntimeError('Config file does not exist')
+    if not config_file.suffix == '.py':
+        raise RuntimeError('Config file must be a python module ending in '
+                           '".py"')
+    app = create_app(config_file=config_file)
+    if not Path(app.config['SQLALCHEMY_DATABASE_URI']
+                .replace('sqlite:///', '')).is_file():
         setup_database(app=app)
     app.run(debug=False)

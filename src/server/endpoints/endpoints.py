@@ -6,14 +6,13 @@ import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
-from flask import render_template, request, send_file, Blueprint
+from flask import render_template, request, send_file, Blueprint, current_app
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI
 from sqlalchemy import desc
 
-from src.server.config.config import ARTIFACT_DB_PATH
 from src.server.database.database import db
 from src.server.database.schemas import JobRois, UserLabel, LabelingJob
 from src.server.util import util
@@ -77,8 +76,7 @@ def get_random_roi():
 
     experiment_id, roi_id = next_roi
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                    '/classifier_prototype_data')
+    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
     with h5py.File(artifact_path, 'r') as f:
         rois = json.loads((f['rois'][()]))
@@ -105,7 +103,7 @@ def get_projection():
     experiment_id = request.args['experiment_id']
     experiment_id = int(experiment_id)
 
-    artifact_db = EvalDBReader(ARTIFACT_DB_PATH)
+    artifact_db = EvalDBReader(current_app.config['ARTIFACT_DB_PATH'])
     projections = artifact_db.get_backgrounds(
         ophys_experiment_id=experiment_id)
 
@@ -155,8 +153,7 @@ def get_video():
     padding = int(request_data.get('padding', 32))
     start, end = request_data['timeframe']
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                        '/classifier_prototype_data')
+    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
 
     with h5py.File(artifact_path, 'r') as f:
