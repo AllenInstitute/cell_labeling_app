@@ -66,3 +66,6 @@ def get_trace(experiment_id: str, roi_id: str):
     with h5py.File(artifact_path, 'r') as f:
         trace = (f['traces'][roi_id][()])
     return trace
+
+
+
