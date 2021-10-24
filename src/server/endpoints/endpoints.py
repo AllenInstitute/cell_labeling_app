@@ -6,7 +6,8 @@ import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
-from flask import render_template, request, send_file, Blueprint, current_app
+from flask import render_template, request, send_file, Blueprint, current_app, \
+    redirect, url_for
 from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
@@ -27,6 +28,11 @@ def index():
         return render_template('index.html')
     else:
         return render_template('login.html')
+
+
+@api.route('/done.html')
+def done():
+    return render_template('done.html')
 
 
 @api.route('/get_roi_contours')
@@ -53,7 +59,7 @@ def get_random_roi():
         .query(JobRois.experiment_id.concat('_').concat(JobRois.roi_id))\
         .join(UserLabel, UserLabel.job_roi_id == JobRois.id)\
         .filter(JobRois.job_id == job_id, UserLabel.user_id ==
-                'adam.amster').all()
+                current_user.get_id()).all()
 
     next_roi_candidates = db.session\
         .query(JobRois.experiment_id, JobRois.roi_id)
@@ -66,7 +72,10 @@ def get_random_roi():
     next_roi_candidates = next_roi_candidates.all()
 
     if not next_roi_candidates:
-        return None, None
+        return {
+            'experiment_id': None,
+            'roi': None
+        }
 
     next_roi = random.choice(next_roi_candidates)
 

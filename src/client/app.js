@@ -52,8 +52,7 @@ class CellLabelingApp {
             let roi;
             if (data['roi'] === null) {
                 // No more rois to label
-                $('#doneModal').modal('show');
-                roi = {experiment_id: null, roi: null};
+                window.location = 'http://localhost:5000/done.html';
             } else {
                 this.experiment_id = data['experiment_id'];
                 this.roi = data['roi'];
