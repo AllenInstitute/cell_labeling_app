@@ -6,6 +6,8 @@ from src.server.database.database import db
 from src.server.endpoints.endpoints import api
 from src.server.database.populate_db import populate_users, \
     populate_labeling_job
+from src.server.endpoints.user_authentication import users
+from src.server.user_authentication.user_authentication import login
 
 
 def create_app(config_file: Path):
@@ -17,6 +19,9 @@ def create_app(config_file: Path):
     app.config.from_pyfile(filename=str(config_file))
     db.init_app(app)
     app.register_blueprint(api)
+    app.register_blueprint(users)
+    app.secret_key = app.config['SESSION_SECRET_KEY']
+    login.init_app(app)
     return app
 
 
@@ -33,6 +38,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_file', help='Path to config file',
                         required=True)
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
     config_file = Path(args.config_file)
@@ -45,4 +51,4 @@ if __name__ == '__main__':
     if not Path(app.config['SQLALCHEMY_DATABASE_URI']
                 .replace('sqlite:///', '')).is_file():
         setup_database(app=app)
-    app.run(debug=False)
+    app.run(debug=args.debug)

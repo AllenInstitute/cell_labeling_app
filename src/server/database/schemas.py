@@ -1,5 +1,7 @@
 import datetime
 
+from flask_login import UserMixin
+
 from src.server.database.database import db
 
 
@@ -19,12 +21,12 @@ class JobRois(db.Model):
                f'{self.experiment_id}, roi_id: {self.roi_id}'
 
 
-class User(db.Model):
-    user_id = db.Column(db.String, primary_key=True)
+class User(UserMixin, db.Model):
+    id = db.Column(db.String, primary_key=True)
 
 
 class UserLabel(db.Model):
-    user_id = db.Column(db.String, db.ForeignKey(User.user_id),
+    user_id = db.Column(db.String, db.ForeignKey(User.id),
                         primary_key=True)
     job_roi_id = db.Column(db.Integer, db.ForeignKey(JobRois.id),
                            primary_key=True)

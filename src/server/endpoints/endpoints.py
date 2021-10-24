@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
 from flask import render_template, request, send_file, Blueprint, current_app
+from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
@@ -20,20 +21,12 @@ from src.server.util import util
 api = Blueprint(name='api', import_name=__name__)
 
 
-def get_current_job_id() -> int:
-    """
-    Gets the current job id by finding the job most recently created
-    :return:
-        current job id
-    """
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).scalar()
-    return job_id
-
-
 @api.route('/')
 def index():
-    return render_template('index.html')
+    if current_user.is_authenticated:
+        return render_template('index.html')
+    else:
+        return render_template('login.html')
 
 
 @api.route('/get_roi_contours')
@@ -52,7 +45,10 @@ def get_roi_contours():
 
 @api.route("/get_random_roi")
 def get_random_roi():
-    job_id = get_current_job_id()
+    # job id is most recently created job id
+    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
+        LabelingJob.date)).scalar()
+
     user_has_labeled = db.session\
         .query(JobRois.experiment_id.concat('_').concat(JobRois.roi_id))\
         .join(UserLabel, UserLabel.job_roi_id == JobRois.id)\
