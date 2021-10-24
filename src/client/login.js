@@ -5,15 +5,15 @@ const loadUsers = function() {
             return `<option value=${user}>${user}</option>`;
         });
         userSelectOptions.forEach(option => {
-            $('select#username').append(option);
+            $('select#inputEmail').append(option);
         });
     });
 };
 
 const login = function() {
-    const selectedUsername = $('select#username').children("option:selected").val();
+    const email = $('#inputEmail').val();
     const postData = {
-        user_id: selectedUsername
+        email
     };
     return $.post('/users/login', JSON.stringify(postData)).then(() => {
         window.location = 'http://localhost:5000/';
@@ -25,5 +25,9 @@ $( document ).ready(function() {
     
     $('button#login').on('click', () => {
         login();
-    })
+    });
+
+    $('button#register').on('click', () => {
+        window.location = 'http://localhost:5000/users/register.html';
+    });
 });
