@@ -4,8 +4,7 @@ from flask import Flask
 
 from src.server.database.database import db
 from src.server.endpoints.endpoints import api
-from src.server.database.populate_db import populate_users, \
-    populate_labeling_job
+from src.server.database.populate_db import populate_labeling_job
 from src.server.endpoints.user_authentication import users
 from src.server.user_authentication.user_authentication import login
 

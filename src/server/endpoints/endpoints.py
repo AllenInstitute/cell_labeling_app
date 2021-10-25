@@ -171,7 +171,11 @@ def get_video():
     this_roi = rois[roi_id]
     timesteps = np.arange(start, end)
 
-    roi_color_map[roi_id] = (255, 0, 0) if include_current_roi_mask else None
+    if include_current_roi_mask:
+        roi_color_map[roi_id] = (255, 0, 0)
+    else:
+        roi_color_map = None
+
     roi_list = rois if include_all_roi_masks else None
 
     video = video_generator.get_thumbnail_video_from_roi(
