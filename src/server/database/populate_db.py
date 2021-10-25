@@ -1,10 +1,9 @@
 import argparse
 import json
 import os
-import random
 import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import h5py
 import numpy as np
@@ -17,7 +16,7 @@ from src.server.main import create_app
 
 
 def _get_all_experiments_and_roi_ids(artifact_dir: Path) -> \
-        List[Tuple[str, int]]:
+        List[str]:
     """
     Iterates through all available experiments, and returns a list of all
     experiment/roi_id combinations

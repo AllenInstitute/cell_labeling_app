@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from flask import Flask
@@ -40,12 +41,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_file', help='Path to config file',
                         required=True)
-    parser.add_argument('--debug', action='store_true')
+    parser.add_argument(
+        '--debug', action='store_true',
+        help='Enable automatic reloading when server-side code changes; '
+             'enable debug level logging')
+    parser.add_argument('--log_file', help='Path to log file')
+    parser.add_argument('--port', default=5000, help='Port to run app')
     args = parser.parse_args()
 
     config_file = Path(args.config_file)
+    port = int(args.port)
+
     app = create_app(config_file=config_file)
     if not Path(app.config['SQLALCHEMY_DATABASE_URI']
                 .replace('sqlite:///', '')).is_file():
         setup_database(app=app)
-    app.run(debug=args.debug)
+
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(filename=args.log_file, level=log_level)
+    app.run(debug=args.debug, port=port)
