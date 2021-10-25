@@ -1,5 +1,6 @@
 class CellLabelingApp {
     constructor() {
+        this.displayLoginMessage();
         this.addListeners();
     }
 
@@ -51,8 +52,7 @@ class CellLabelingApp {
             let roi;
             if (data['roi'] === null) {
                 // No more rois to label
-                $('#doneModal').modal('show');
-                roi = {experiment_id: null, roi: null};
+                window.location = 'http://localhost:5000/done.html';
             } else {
                 this.experiment_id = data['experiment_id'];
                 this.roi = data['roi'];
@@ -305,7 +305,7 @@ class CellLabelingApp {
                 </div>`;
             alert = $(alert);
 
-            alert.insertAfter($('#label_bar'));
+            alert.insertBefore($('#label_bar'));
             
             setTimeout(() => $('#alert-error').alert('close'), 10000);
             return;
@@ -352,7 +352,7 @@ class CellLabelingApp {
                 </div>`;
             alert = $(alert);
 
-            alert.insertAfter($('#label_bar'));
+            alert.insertBefore($('#label_bar'));
             
             setTimeout(() => $('#alert-error').alert('close'), 10000);
         });
@@ -375,6 +375,21 @@ class CellLabelingApp {
             $('#label_cell').prop('checked', false);
             $('#label_not_cell').prop('checked', false);
         })
+    }
+
+    displayLoginMessage() {
+        $.get('/users/getCurrentUser').then(data => {
+            const username = data['user_id'];
+            let alert = `
+                <div class="alert alert-info fade show" role="alert" style="margin-top: 20px" id="alert-error">
+                    Logged in as ${username}
+                </div>`;
+            alert = $(alert);
+
+            alert.insertBefore($('#label_bar'));
+            
+            setTimeout(() => $('#alert-error').alert('close'), 5000);
+        });
     }
 }
 

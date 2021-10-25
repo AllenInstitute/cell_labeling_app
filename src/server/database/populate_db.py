@@ -6,7 +6,7 @@ from src.server.database.schemas import User, LabelingJob, JobRois
 def populate_users(db):
     users = ('adam.amster', 'scott.daniel', 'wayne.wakeman', 'michael.wang')
     for user in users:
-        user = User(user_id=user)
+        user = User(id=user)
         db.session.add(user)
     db.session.commit()
 

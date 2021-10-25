@@ -6,14 +6,15 @@ import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
-from flask import render_template, request, send_file, Blueprint
+from flask import render_template, request, send_file, Blueprint, current_app, \
+    redirect, url_for
+from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
 from ophys_etl.modules.segmentation.qc_utils.video_utils import \
     video_bounds_from_ROI
 from sqlalchemy import desc
 
-from src.server.config.config import ARTIFACT_DB_PATH
 from src.server.database.database import db
 from src.server.database.schemas import JobRois, UserLabel, LabelingJob
 from src.server.util import util
@@ -21,20 +22,17 @@ from src.server.util import util
 api = Blueprint(name='api', import_name=__name__)
 
 
-def get_current_job_id() -> int:
-    """
-    Gets the current job id by finding the job most recently created
-    :return:
-        current job id
-    """
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).scalar()
-    return job_id
-
-
 @api.route('/')
 def index():
-    return render_template('index.html')
+    if current_user.is_authenticated:
+        return render_template('index.html')
+    else:
+        return render_template('login.html')
+
+
+@api.route('/done.html')
+def done():
+    return render_template('done.html')
 
 
 @api.route('/get_roi_contours')
@@ -53,12 +51,15 @@ def get_roi_contours():
 
 @api.route("/get_random_roi")
 def get_random_roi():
-    job_id = get_current_job_id()
+    # job id is most recently created job id
+    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
+        LabelingJob.date)).scalar()
+
     user_has_labeled = db.session\
         .query(JobRois.experiment_id.concat('_').concat(JobRois.roi_id))\
         .join(UserLabel, UserLabel.job_roi_id == JobRois.id)\
         .filter(JobRois.job_id == job_id, UserLabel.user_id ==
-                'adam.amster').all()
+                current_user.get_id()).all()
 
     next_roi_candidates = db.session\
         .query(JobRois.experiment_id, JobRois.roi_id)
@@ -71,14 +72,16 @@ def get_random_roi():
     next_roi_candidates = next_roi_candidates.all()
 
     if not next_roi_candidates:
-        return None, None
+        return {
+            'experiment_id': None,
+            'roi': None
+        }
 
     next_roi = random.choice(next_roi_candidates)
 
     experiment_id, roi_id = next_roi
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                    '/classifier_prototype_data')
+    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
     with h5py.File(artifact_path, 'r') as f:
         rois = json.loads((f['rois'][()]))
@@ -105,7 +108,7 @@ def get_projection():
     experiment_id = request.args['experiment_id']
     experiment_id = int(experiment_id)
 
-    artifact_db = EvalDBReader(ARTIFACT_DB_PATH)
+    artifact_db = EvalDBReader(current_app.config['ARTIFACT_DB_PATH'])
     projections = artifact_db.get_backgrounds(
         ophys_experiment_id=experiment_id)
 
@@ -155,8 +158,7 @@ def get_video():
     padding = int(request_data.get('padding', 32))
     start, end = request_data['timeframe']
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                        '/classifier_prototype_data')
+    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
     artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
 
     with h5py.File(artifact_path, 'r') as f:
