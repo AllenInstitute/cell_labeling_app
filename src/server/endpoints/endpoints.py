@@ -234,7 +234,10 @@ def get_fov_bounds():
 @api.route('/add_label', methods=['POST'])
 def add_label():
     data = request.get_json(force=True)
+    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
+        LabelingJob.date)).first()[0]
     roi_id = db.session.query(JobRois.id).filter(
+        JobRois.job_id == job_id,
         JobRois.experiment_id == data['experiment_id'],
         JobRois.roi_id == int(data['roi_id']))\
         .first()
