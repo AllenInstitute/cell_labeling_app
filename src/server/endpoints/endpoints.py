@@ -53,7 +53,7 @@ def get_roi_contours():
 def get_random_roi():
     # job id is most recently created job id
     job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).scalar()
+        LabelingJob.date)).first()[0]
 
     user_has_labeled = db.session\
         .query(JobRois.experiment_id.concat('_').concat(JobRois.roi_id))\
