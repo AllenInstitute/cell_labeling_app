@@ -1,3 +1,21 @@
+class LoadingIndicator {
+    constructor() {
+        this.loadingTxt = [];
+    }
+
+    add(msg) {
+        this.loadingTxt.push(msg);
+        $('#loading_text').text(this.loadingTxt[this.loadingTxt.length-1]);
+    }
+
+    remove(msg) {
+        this.loadingTxt = this.loadingTxt.filter(txt => txt != msg);
+        if (this.loadingTxt) {
+            $('#loading_text').text(this.loadingTxt[this.loadingTxt.length-1]);
+        }
+    }
+}
+
 class CellLabelingApp {
     constructor() {
         this.displayLoginMessage();
@@ -72,6 +90,8 @@ class CellLabelingApp {
 
     displayTrace() {
         const url = `http://localhost:5000/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`;
+        this.loadingIndicator.add('Loading trace...');
+
         return $.get(url, data => {
             const trace = {
                 x: _.range(data['trace'].length),
@@ -95,6 +115,8 @@ class CellLabelingApp {
             if (this.is_video_shown) {
                 $('button#trim_video_to_timeframe').attr('disabled', false);
             }
+
+            this.loadingIndicator.remove('Loading trace...');
         });
     }
 
@@ -102,6 +124,7 @@ class CellLabelingApp {
         let roi_contours = this.roi_contours;
 
         if (roi_contours === null) {
+            this.loadingIndicator.add('Loading current roi contour...');
             $("#projection_include_mask_outline").attr("disabled", true);
             const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
             await $.get(url, data => {
@@ -109,6 +132,8 @@ class CellLabelingApp {
     
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
+
+                this.loadingIndicator.remove('Loading current roi contour...');
             });
         }
         
@@ -170,9 +195,11 @@ class CellLabelingApp {
 
             // Now load all contours in background
             const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
+            this.loadingIndicator.add('Loading all roi contours...');
             return $.get(url, data => {
                 this.roi_contours = data['contours'];
                 $("#projection_include_surrounding_rois").attr("disabled", false);
+                this.loadingIndicator.remove('Loading all roi contours...');
             });
         }
 
@@ -180,6 +207,8 @@ class CellLabelingApp {
     }
 
     async displayProjection() {
+        this.loadingIndicator.add('Loading projection...');
+
         // Disable projection settings until loaded
         $('#projection_type').attr('disabled', true);
         $("#projection_include_mask_outline").attr("disabled", true);
@@ -229,6 +258,8 @@ class CellLabelingApp {
                 $("#projection_include_surrounding_rois").attr("disabled", false);
             }
 
+            this.loadingIndicator.remove('Loading projection...');
+
             this.toggleContoursOnProjection().then(() => {
                 $("#projection_include_surrounding_rois").attr("disabled", false);
             })
@@ -236,6 +267,8 @@ class CellLabelingApp {
     }
     
     async displayVideo() {
+        this.loadingIndicator.add('Loading video...');
+
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
         $('#video_include_surrounding_rois').attr('disabled', true);
@@ -279,7 +312,10 @@ class CellLabelingApp {
         }).then(response => {
             const blob = new Blob([response], {type: "video\/mp4"});
             const blobUrl = URL.createObjectURL(blob);
-            $('#movie').attr("src", blobUrl);
+            const video = `
+                <video controls id="movie" width="452" height="452" src=${blobUrl}></video>
+            `;
+            $('#video_container').append($(video));
 
             $('#video_include_mask_outline').attr("disabled", false);
             $('#video_include_surrounding_rois').attr('disabled', false);
@@ -291,6 +327,7 @@ class CellLabelingApp {
             $('#timestep_display').text(`Timesteps: ${this.videoTimeframe[0]} - ${this.videoTimeframe[1]}`);
 
             this.is_video_shown = true;
+            this.loadingIndicator.remove('Loading video...');
         })
     }
 
@@ -335,11 +372,13 @@ class CellLabelingApp {
         this.experiment_id = null;
         this.projection_is_shown = false;
         this.roi = null;
+        this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
     }
 
     async loadNewRoi() {
+        $('#movie').remove();
         this.initialize();
         $('#loading_text').css('display', 'inline');
 
@@ -371,9 +410,11 @@ class CellLabelingApp {
             roi_id: this.roi['id'],
             label: label
         };
+        this.loadingIndicator.add('Submitting...');
         return $.post(url, JSON.stringify(data)).then(() => {
             $('#label_cell').prop('checked', false);
             $('#label_not_cell').prop('checked', false);
+            this.loadingIndicator.remove('Submitting...');
         })
     }
 

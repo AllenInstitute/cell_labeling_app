@@ -240,7 +240,8 @@ def add_label():
         JobRois.roi_id == int(data['roi_id']))\
         .first()
     roi_id = roi_id[0]
-    user_label = UserLabel(user_id='adam.amster', job_roi_id=roi_id,
+    user_id = current_user.get_id()
+    user_label = UserLabel(user_id=user_id, job_roi_id=roi_id,
                            label=data['label'])
     db.session.add(user_label)
     db.session.commit()
