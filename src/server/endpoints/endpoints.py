@@ -6,8 +6,7 @@ import h5py
 import numpy as np
 from PIL import Image
 from evaldb.reader import EvalDBReader
-from flask import render_template, request, send_file, Blueprint, current_app, \
-    redirect, url_for
+from flask import render_template, request, send_file, Blueprint, current_app
 from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
@@ -25,9 +24,9 @@ api = Blueprint(name='api', import_name=__name__)
 @api.route('/')
 def index():
     if current_user.is_authenticated:
-        return render_template('index.html')
+        return render_template('index.html', port=current_app.config['PORT'])
     else:
-        return render_template('login.html')
+        return render_template('login.html', port=current_app.config['PORT'])
 
 
 @api.route('/done.html')

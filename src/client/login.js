@@ -16,7 +16,7 @@ const login = function() {
         email
     };
     return $.post('/users/login', JSON.stringify(postData)).then(() => {
-        window.location = 'http://localhost:5000/';
+        window.location = `http://localhost:${PORT}/`;
     });
 };
 
@@ -28,6 +28,6 @@ $( document ).ready(function() {
     });
 
     $('button#register').on('click', () => {
-        window.location = 'http://localhost:5000/users/register.html';
+        window.location = `http://localhost:${PORT}/users/register.html`;
     });
 });

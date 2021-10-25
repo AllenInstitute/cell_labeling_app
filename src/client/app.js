@@ -66,11 +66,11 @@ class CellLabelingApp {
     }
 
     async getRandomRoiFromRandomExperiment() {
-        const roi = await $.get('http://localhost:5000/get_random_roi', data => {
+        const roi = await $.get(`http://localhost:${PORT}/get_random_roi`, data => {
             let roi;
             if (data['roi'] === null) {
                 // No more rois to label
-                window.location = 'http://localhost:5000/done.html';
+                window.location = `http://localhost:${PORT}/done.html`;
             } else {
                 this.experiment_id = data['experiment_id'];
                 this.roi = data['roi'];
@@ -80,7 +80,7 @@ class CellLabelingApp {
         });
         
         if (roi['roi'] !== null) {
-            const fovBounds = await $.post('http://localhost:5000/get_fov_bounds', JSON.stringify(this.roi));
+            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.roi));
             this.fovBounds = fovBounds;
         }
 
@@ -89,7 +89,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:5000/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`;
         this.loadingIndicator.add('Loading trace...');
 
         return $.get(url, data => {
@@ -126,7 +126,7 @@ class CellLabelingApp {
         if (roi_contours === null) {
             this.loadingIndicator.add('Loading current roi contour...');
             $("#projection_include_mask_outline").attr("disabled", true);
-            const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
+            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
             await $.get(url, data => {
                 roi_contours = data['contours'];
     
@@ -194,7 +194,7 @@ class CellLabelingApp {
             $("#projection_include_surrounding_rois").attr("disabled", true);
 
             // Now load all contours in background
-            const url = `http://localhost:5000/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
+            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
             this.loadingIndicator.add('Loading all roi contours...');
             return $.get(url, data => {
                 this.roi_contours = data['contours'];
@@ -215,7 +215,7 @@ class CellLabelingApp {
         $("#projection_include_surrounding_rois").attr("disabled", true);
 
         const projection_type = $('#projection_type').children("option:selected").val();
-        const url = `http://localhost:5000/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
+        const url = `http://localhost:${PORT}/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
         return $.get(url, async data => {
             const trace1 = {
                 source: data['projection'],
@@ -284,7 +284,7 @@ class CellLabelingApp {
         let videoTimeframe = this.videoTimeframe;
 
         if (videoTimeframe === null) {
-            await fetch(`http://localhost:5000/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
+            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
             .then(data => data.json())
             .then(data => {
                 videoTimeframe = data['timeframe'];
@@ -293,7 +293,7 @@ class CellLabelingApp {
 
         this.videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
 
-        const url = `http://localhost:5000/get_video`;
+        const url = `http://localhost:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.roi['id'],
@@ -403,7 +403,7 @@ class CellLabelingApp {
     }
 
     submitLabel() {
-        const url = `http://localhost:5000/add_label`;
+        const url = `http://localhost:${PORT}/add_label`;
         const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
         const data = {
             experiment_id: this.experiment_id,

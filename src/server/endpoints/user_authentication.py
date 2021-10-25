@@ -1,4 +1,5 @@
-from flask import Blueprint, request, redirect, url_for, render_template
+from flask import Blueprint, request, redirect, url_for, render_template, \
+    current_app
 from flask_login import login_user, current_user
 
 from src.server.database.database import db
@@ -9,7 +10,7 @@ users = Blueprint(name='users', import_name=__name__, url_prefix='/users')
 
 @users.route('/register.html')
 def load_register_page():
-    return render_template('register.html')
+    return render_template('register.html', port=current_app.config['PORT'])
 
 
 @users.route('/register', methods=['POST'])

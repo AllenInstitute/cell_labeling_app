@@ -16,7 +16,7 @@ const register = function() {
     };
     $.post('/users/register', JSON.stringify(postData))
         .then(() => {
-            window.location = 'http://localhost:5000/';
+            window.location = `http://localhost:${PORT}/`;
         })
         .catch(error => {
             displayErrorMsg(error.responseJSON['msg']);

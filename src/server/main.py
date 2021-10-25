@@ -9,7 +9,7 @@ from src.server.endpoints.user_authentication import users
 from src.server.user_authentication.user_authentication import login
 
 
-def create_app(config_file: Path):
+def create_app(config_file: Path, port=5000):
     if not config_file.exists():
         raise ValueError('Config file does not exist')
     if not config_file.suffix == '.py':
@@ -22,6 +22,7 @@ def create_app(config_file: Path):
                           template_folder=str(template_dir))
     app.register_blueprint(api)
     app.config.from_pyfile(filename=str(config_file))
+    app.config['PORT'] = port
     db.init_app(app)
     app.register_blueprint(api)
     app.register_blueprint(users)
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     config_file = Path(args.config_file)
     port = int(args.port)
 
-    app = create_app(config_file=config_file)
+    app = create_app(config_file=config_file, port=port)
     if not Path(app.config['SQLALCHEMY_DATABASE_URI']
                 .replace('sqlite:///', '')).is_file():
         setup_database(app=app)
