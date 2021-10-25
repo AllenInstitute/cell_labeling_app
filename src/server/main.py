@@ -28,7 +28,6 @@ def create_app(config_file: Path):
 def setup_database(app: Flask):
     with app.app_context():
         db.create_all()
-        populate_users(db)
         populate_labeling_job(db)
 
 
