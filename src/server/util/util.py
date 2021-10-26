@@ -47,14 +47,16 @@ def get_roi_contours(experiment_id: str, current_roi_id: str,
         contours, _ = cv2.findContours(blank, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_NONE)
         if reshape_contours_to_list:
-            contours = contours[0].reshape(contours[0].shape[0], 2).tolist()\
-                if len(contours) == 1 else []
+            contours = [
+                x.reshape(x.shape[0], 2).tolist() for x in contours
+            ]
         color = (255, 0, 0) if id == current_roi_id else roi_color_map[str(id)]
-        all_contours.append({
-            'contour': contours,
-            'color': color,
-            'id': id
-        })
+        for contour in contours:
+            all_contours.append({
+                'contour': contour,
+                'color': color,
+                'id': id
+            })
     return all_contours
 
 
