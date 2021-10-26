@@ -314,7 +314,7 @@ class CellLabelingApp {
 
         if (videoTimeframe === null) {
             await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
-            .then(data => data.json())
+            .then(async data => await data.json())
             .then(data => {
                 videoTimeframe = data['timeframe'];
             });
@@ -344,7 +344,7 @@ class CellLabelingApp {
             const video = `
                 <video controls id="movie" width="452" height="452" src=${blobUrl}></video>
             `;
-            $('#video_container').append($(video));
+            $('#video_container').html($(video));
 
             $('#video_include_mask_outline').attr("disabled", false);
             $('#video_include_surrounding_rois').attr('disabled', false);
