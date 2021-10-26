@@ -61,7 +61,8 @@ def get_random_roi():
                 current_user.get_id()).all()
 
     next_roi_candidates = db.session\
-        .query(JobRois.experiment_id, JobRois.roi_id)
+        .query(JobRois.experiment_id, JobRois.roi_id)\
+        .filter(JobRois.job_id == job_id)
 
     for roi in user_has_labeled:
         roi = roi[0]
