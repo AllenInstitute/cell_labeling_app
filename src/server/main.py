@@ -60,4 +60,9 @@ if __name__ == '__main__':
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(filename=args.log_file, level=log_level)
-    app.run(debug=args.debug, port=port)
+
+    if args.debug:
+        app.run(debug=True, port=port)
+    else:
+        from waitress import serve
+        serve(app, port=port)
