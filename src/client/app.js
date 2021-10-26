@@ -1,3 +1,14 @@
+function getBase64Image(img, filter) {
+    var canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    var ctx = canvas.getContext("2d");
+    ctx.filter = filter;
+    ctx.drawImage(img, 0, 0);
+    var dataURL = canvas.toDataURL("image/png");
+    return dataURL;
+  }
+
 class LoadingIndicator {
     constructor() {
         this.loadingTxt = [];
@@ -63,6 +74,14 @@ class CellLabelingApp {
         $('#label_not_cell').on('click', () => {
             $('button#submit_label').attr('disabled', false);
         });
+
+        $('input#projection_contrast').on('change', () => {
+            this.updateProjectionContrast();
+        });
+
+        $('button#projection_contrast_reset').on('click', () => {
+            this.resetProjectionContrast();
+        })
     }
 
     async getRandomRoiFromRandomExperiment() {
@@ -213,6 +232,12 @@ class CellLabelingApp {
         $('#projection_type').attr('disabled', true);
         $("#projection_include_mask_outline").attr("disabled", true);
         $("#projection_include_surrounding_rois").attr("disabled", true);
+        $('#projection_contrast').attr('disabled', true);
+        $('button#projection_contrast_reset').attr('disabled', true);
+
+        // reset projection contrast
+        $('input#projection_contrast').val(100);
+        $('#projection_contrast_label').text(`Contrast: 100%`);
 
         const projection_type = $('#projection_type').children("option:selected").val();
         const url = `http://localhost:${PORT}/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
@@ -253,6 +278,8 @@ class CellLabelingApp {
             }
             $('#projection_type').attr('disabled', false);
             $("#projection_include_mask_outline").attr("disabled", false);
+            $('#projection_contrast').attr('disabled', false);
+            $('button#projection_contrast_reset').attr('disabled', false);
 
             if (this.roi_contours !== null) {
                 $("#projection_include_surrounding_rois").attr("disabled", false);
@@ -262,8 +289,10 @@ class CellLabelingApp {
 
             this.toggleContoursOnProjection().then(() => {
                 $("#projection_include_surrounding_rois").attr("disabled", false);
-            })
-        })
+            });
+
+            this.projection_source = data['projection'];
+        });
     }
     
     async displayVideo() {
@@ -371,6 +400,7 @@ class CellLabelingApp {
         this.videoTimeframe = null;
         this.experiment_id = null;
         this.projection_is_shown = false;
+        this.projection_source = null;
         this.roi = null;
         this.loadingIndicator = new LoadingIndicator();
 
@@ -431,6 +461,24 @@ class CellLabelingApp {
             
             setTimeout(() => $('#alert-error').alert('close'), 5000);
         });
+    }
+
+    updateProjectionContrast(contrast = null) {
+        const val = contrast === null ? $('input#projection_contrast').val() : contrast;
+        $('input#projection_contrast').val(val);
+        $('#projection_contrast_label').text(`Contrast: ${val}%`);
+        const image = new Image();
+        image.src = this.projection_source;
+        image.onload = function() {
+            const filter = `contrast(${val}%)`;
+            const imgSource = getBase64Image(image, filter);
+            Plotly.update('projection', {source: imgSource});
+        }
+
+    }
+
+    resetProjectionContrast() {
+        this.updateProjectionContrast(100);
     }
 }
 
