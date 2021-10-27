@@ -21,8 +21,10 @@ class LoadingIndicator {
 
     remove(msg) {
         this.loadingTxt = this.loadingTxt.filter(txt => txt != msg);
-        if (this.loadingTxt) {
+        if (this.loadingTxt.length > 0) {
             $('#loading_text').text(this.loadingTxt[this.loadingTxt.length-1]);
+        } else {
+            $('#loading_text').text('');
         }
     }
 }
@@ -441,9 +443,7 @@ class CellLabelingApp {
             setTimeout(() => $('#alert-error').alert('close'), 10000);
         });
         if (roi['roi'] !== null) {
-            this.displayArtifacts().then(() => {
-                $('#loading_text').hide();
-            })
+            this.displayArtifacts();
         }
     }
 
