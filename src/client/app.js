@@ -216,9 +216,17 @@ class CellLabelingApp {
             const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
             this.loadingIndicator.add('Loading all roi contours...');
             return $.get(url, data => {
-                this.roi_contours = data['contours'];
-                $("#projection_include_surrounding_rois").attr("disabled", false);
-                this.loadingIndicator.remove('Loading all roi contours...');
+
+                // Make sure this request is not from some previous ROI
+                if (!this.is_loading_new_roi && data['contours'][0]['experiment_id'] === this.roi['experiment_id']) {
+                    this.roi_contours = data['contours'];
+
+                    if (this.show_all_roi_outlines_on_projection) {
+                        this.toggleContoursOnProjection();
+                    }
+                    $("#projection_include_surrounding_rois").attr("disabled", false);
+                    this.loadingIndicator.remove('Loading all roi contours...');
+                }
             });
         }
 
@@ -402,6 +410,7 @@ class CellLabelingApp {
         this.projection_is_shown = false;
         this.projection_source = null;
         this.roi = null;
+        this.is_loading_new_roi = false;
         this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
@@ -410,9 +419,15 @@ class CellLabelingApp {
     async loadNewRoi() {
         $('#movie').remove();
         this.initialize();
+        this.is_loading_new_roi = true;
         $('#loading_text').css('display', 'inline');
 
-        const roi = await this.getRandomRoiFromRandomExperiment().catch(() => {
+        const roi = await this.getRandomRoiFromRandomExperiment()
+        .then(roi => {
+            this.is_loading_new_roi = false;
+            return roi;
+        })
+        .catch(() => {
             $('#loading_text').hide();
 
             let alert = `

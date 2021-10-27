@@ -55,7 +55,8 @@ def get_roi_contours(experiment_id: str, current_roi_id: str,
             all_contours.append({
                 'contour': contour,
                 'color': color,
-                'id': id
+                'id': id,
+                'experiment_id': experiment_id
             })
     return all_contours
 
