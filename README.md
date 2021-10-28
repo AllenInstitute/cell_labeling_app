@@ -18,7 +18,7 @@ On linux the command is
 ssh -L <PORT>:localhost:<PORT> -N -f -l <username> <domain name of computer in step (1)>
 ```
 
-4. Go to localhost:<PORT> in a browser
+4. Go to `localhost:<PORT>` in a browser
 
 ## Notes
 
