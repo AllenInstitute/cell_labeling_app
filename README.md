@@ -18,7 +18,7 @@ You will need a config file (.py) to run the app. It currently requires the foll
 
 Execute `src.server.main` to start the web server.
 
-3. If this computer does not have access to a browser, then you need to tunnel to port `5000` on a computer that does.
+3. If this computer does not have access to a browser, then you need to tunnel to port `<PORT>` on a computer that does.
 On linux the command is 
 ```
 ssh -L <PORT>:localhost:<PORT> -N -f -l <username> <domain name of computer in step (1)>
