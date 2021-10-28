@@ -16,5 +16,5 @@ for exp_id in ${exp_ids[@]}
       --video_path ${video_path}/ophys_experiment_${exp_id}/denoised.h5 \
       --correlation_path ${correlation_dir}/${exp_id}_correlation_proj.png \
       --roi_path ${roi_path}/${exp_id}_suite2p_rois.json \
-      --artifact_path ${out_path}/${exp_id}.h5 &
+      --artifact_path ${out_path}/${exp_id}_artifacts.h5 &
   done

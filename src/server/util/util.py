@@ -70,5 +70,5 @@ def get_trace(experiment_id: str, roi_id: str):
 
 def get_artifacts_path(experiment_id: str):
     artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
-    artifact_path = artifact_dir / f'{experiment_id}.h5'
+    artifact_path = artifact_dir / f'{experiment_id}_artifacts.h5'
     return artifact_path
