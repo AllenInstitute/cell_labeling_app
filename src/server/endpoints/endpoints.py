@@ -5,7 +5,6 @@ from pathlib import Path
 import h5py
 import numpy as np
 from PIL import Image
-from evaldb.reader import EvalDBReader
 from flask import render_template, request, send_file, Blueprint, current_app
 from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
@@ -17,6 +16,7 @@ from sqlalchemy import desc
 from src.server.database.database import db
 from src.server.database.schemas import JobRois, UserLabel, LabelingJob
 from src.server.util import util
+from src.server.util.util import get_artifacts_path
 
 api = Blueprint(name='api', import_name=__name__)
 
@@ -81,8 +81,7 @@ def get_random_roi():
 
     experiment_id, roi_id = next_roi
 
-    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
-    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
     with h5py.File(artifact_path, 'r') as f:
         rois = json.loads((f['rois'][()]))
 
@@ -106,24 +105,21 @@ def get_random_roi():
 def get_projection():
     projection_type = request.args['type']
     experiment_id = request.args['experiment_id']
-    experiment_id = int(experiment_id)
 
-    artifact_db = EvalDBReader(current_app.config['ARTIFACT_DB_PATH'])
-    projections = artifact_db.get_backgrounds(
-        ophys_experiment_id=experiment_id)
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    # TODO add background type to artifact DB
-    if projection_type == 'max':
-        path = [x for x in projections if 'max_proj' in x.stem][0]
-    elif projection_type == 'average':
-        path = [x for x in projections if 'avg_proj' in x.stem][0]
-    elif projection_type == 'correlation':
-        path = [x for x in projections if 'correlation_proj' in
-                      x.stem][0]
-    else:
-        return 'bad projection type', 400
+    with h5py.File(artifact_path, 'r') as f:
+        if projection_type == 'max':
+            dataset_name = 'max_projection'
+        elif projection_type == 'average':
+            dataset_name = 'avg_projection'
+        elif projection_type == 'correlation':
+            dataset_name = 'correlation_projection'
+        else:
+            return 'bad projection type', 400
+        projection = f[dataset_name][:]
 
-    image = Image.open(path)
+    image = Image.fromarray(projection)
     img_str = util.convert_pil_image_to_base64(img=image)
 
     return {
@@ -158,8 +154,7 @@ def get_video():
     padding = int(request_data.get('padding', 32))
     start, end = request_data['timeframe']
 
-    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
-    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
     with h5py.File(artifact_path, 'r') as f:
         video_generator = VideoGenerator(video_data=f['video_data'][()])

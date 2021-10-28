@@ -7,6 +7,7 @@ import cv2
 import h5py
 import numpy as np
 from PIL import Image
+from flask import current_app
 
 
 def convert_pil_image_to_base64(img: Image) -> str:
@@ -21,9 +22,7 @@ def get_roi_contours(experiment_id: str, current_roi_id: str,
                       include_all_rois=True, reshape_contours_to_list=True):
     current_roi_id = int(current_roi_id)
 
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                        '/classifier_prototype_data')
-    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
     with h5py.File(artifact_path, 'r') as f:
         rois = json.loads((f['rois'][()]))
         roi_color_map = json.loads(f['roi_color_map'][()])
@@ -62,13 +61,14 @@ def get_roi_contours(experiment_id: str, current_roi_id: str,
 
 
 def get_trace(experiment_id: str, roi_id: str):
-    artifact_dir = Path('/allen/aibs/informatics/danielsf'
-                        '/classifier_prototype_data')
-    artifact_path = artifact_dir / f'{experiment_id}_classifier_artifacts.h5'
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
     with h5py.File(artifact_path, 'r') as f:
         trace = (f['traces'][roi_id][()])
     return trace
 
 
-
+def get_artifacts_path(experiment_id: str):
+    artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
+    artifact_path = artifact_dir / f'{experiment_id}.h5'
+    return artifact_path
