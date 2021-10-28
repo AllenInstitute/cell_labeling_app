@@ -9,6 +9,12 @@ cd cell_labeling_app
 conda env create -f environment.yml
 conda activate cell_labeling_app
 ```
+You will need a config file (.py) to run the app. It currently requires the following:
+
+| variable                | description                                                       |
+|-------------------------|-------------------------------------------------------------------|
+| SQLALCHEMY_DATABASE_URI | Path to app database (will get created if does not already exist) |
+| ARTIFACT_DIR            | Path to artifacts (videos, projections, etc) (as hdf5 files)      |
 
 Execute `src.server.main` to start the web server.
 
