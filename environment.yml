@@ -40,7 +40,6 @@ dependencies:
     - croissant-ml==0.0.3
     - cryptography==35.0.0
     - cycler==0.10.0
-    - evaldb==0.2.0
     - flask==2.0.2
     - flask-sqlalchemy==2.5.1
     - greenlet==1.1.2
