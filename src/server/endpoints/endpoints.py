@@ -1,6 +1,6 @@
 import json
 import random
-from pathlib import Path
+from io import BytesIO
 
 import h5py
 import numpy as np
@@ -119,12 +119,15 @@ def get_projection():
             return 'bad projection type', 400
         projection = f[dataset_name][:]
 
-    image = Image.fromarray(projection)
-    img_str = util.convert_pil_image_to_base64(img=image)
+    if len(projection.shape) == 3:
+        projection = projection[:, :, 0]
+    projection = projection.astype('uint16')
 
-    return {
-        'projection': img_str
-    }
+    image = Image.fromarray(projection)
+    image = image.tobytes()
+    return send_file(
+        BytesIO(image),
+        mimetype='image/png')
 
 
 @api.route('/get_trace')

@@ -1,35 +1,17 @@
-function getBase64Image(img, filter) {
-    var canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    var ctx = canvas.getContext("2d");
-    ctx.filter = filter;
-    ctx.drawImage(img, 0, 0);
-    var dataURL = canvas.toDataURL("image/png");
-    return dataURL;
-  }
+import {
+    clipImageToQuantiles,
+    bytesToMatrix,
+    scaleToUint8,
+    toRGB
+} from './util.js';
 
-class LoadingIndicator {
-    constructor() {
-        this.loadingTxt = [];
-    }
+import {
+    LoadingIndicator
+} from './loadingIndicator.js';
 
-    add(msg) {
-        this.loadingTxt.push(msg);
-        $('#loading_text').text(this.loadingTxt[this.loadingTxt.length-1]);
-    }
-
-    remove(msg) {
-        this.loadingTxt = this.loadingTxt.filter(txt => txt != msg);
-        if (this.loadingTxt.length > 0) {
-            $('#loading_text').text(this.loadingTxt[this.loadingTxt.length-1]);
-        } else {
-            $('#loading_text').text('');
-        }
-    }
-}
 
 class CellLabelingApp {
+    /* Main App class */
     constructor() {
         this.displayLoginMessage();
         this.addListeners();
@@ -77,8 +59,10 @@ class CellLabelingApp {
             $('button#submit_label').attr('disabled', false);
         });
 
-        $('input#projection_contrast').on('change', () => {
-            this.updateProjectionContrast();
+        $('input#projection_contrast_low_quantile, input#projection_contrast_high_quantile').on('input', () => {
+            const low = $('input#projection_contrast_low_quantile').val();
+            const high = $('input#projection_contrast_high_quantile').val()
+            this.updateProjectionContrast(low, high);
         });
 
         $('button#projection_contrast_reset').on('click', () => {
@@ -244,6 +228,9 @@ class CellLabelingApp {
         $("#projection_include_surrounding_rois").attr("disabled", true);
         $('#projection_contrast').attr('disabled', true);
         $('button#projection_contrast_reset').attr('disabled', true);
+        $('input#projection_contrast_low_quantile').attr('disabled', true);
+        $('input#projection_contrast_high_quantile').attr('disabled', true);
+
 
         // reset projection contrast
         $('input#projection_contrast').val(100);
@@ -251,9 +238,21 @@ class CellLabelingApp {
 
         const projection_type = $('#projection_type').children("option:selected").val();
         const url = `http://localhost:${PORT}/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
-        return $.get(url, async data => {
+        return fetch(url).then(async data => {
+            const blob = await data.blob();
+            data = await bytesToMatrix(blob);
+            
+            data = data._data;
+            this.projection_raw = data;
+            
+            if (projection_type !== 'correlation') {
+                data = scaleToUint8(data);
+            }
+
+            data = toRGB(data);
+        
             const trace1 = {
-                source: data['projection'],
+                z: data,
                 type: 'image'
             };
         
@@ -283,13 +282,12 @@ class CellLabelingApp {
                 });
             }
             
-            if (this.roi_contours === null) {
-
-            }
             $('#projection_type').attr('disabled', false);
             $("#projection_include_mask_outline").attr("disabled", false);
             $('#projection_contrast').attr('disabled', false);
             $('button#projection_contrast_reset').attr('disabled', false);
+            $('input#projection_contrast_low_quantile').attr('disabled', false);
+            $('input#projection_contrast_high_quantile').attr('disabled', false);
 
             if (this.roi_contours !== null) {
                 $("#projection_include_surrounding_rois").attr("disabled", false);
@@ -301,7 +299,7 @@ class CellLabelingApp {
                 $("#projection_include_surrounding_rois").attr("disabled", false);
             });
 
-            this.projection_source = data['projection'];
+            this.updateProjectionContrast();
         });
     }
     
@@ -410,7 +408,7 @@ class CellLabelingApp {
         this.videoTimeframe = null;
         this.experiment_id = null;
         this.projection_is_shown = false;
-        this.projection_source = null;
+        this.projection_raw = null;
         this.roi = null;
         this.is_loading_new_roi = false;
         this.loadingIndicator = new LoadingIndicator();
@@ -478,22 +476,29 @@ class CellLabelingApp {
         });
     }
 
-    updateProjectionContrast(contrast = null) {
-        const val = contrast === null ? $('input#projection_contrast').val() : contrast;
-        $('input#projection_contrast').val(val);
-        $('#projection_contrast_label').text(`Contrast: ${val}%`);
-        const image = new Image();
-        image.src = this.projection_source;
-        image.onload = function() {
-            const filter = `contrast(${val}%)`;
-            const imgSource = getBase64Image(image, filter);
-            Plotly.update('projection', {source: imgSource});
-        }
+    updateProjectionContrast(low = 0.0, high = 1.0) {
+        $('input#projection_contrast_low_quantile').val(low);
+        $('input#projection_contrast_high_quantile').val(high);
 
+        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${low}`);
+        $('#projection_contrast_high_quantile_label').text(`High quantile: ${high}`);
+
+        let x = clipImageToQuantiles(this.projection_raw, low, high);
+        x = scaleToUint8(x);
+        x = toRGB(x);
+
+        const trace1 = {
+            z: x,
+            type: 'image'
+        };
+
+        const layout = document.getElementById('projection').layout;
+
+        Plotly.react('projection', [trace1], layout);
     }
 
     resetProjectionContrast() {
-        this.updateProjectionContrast(100);
+        this.updateProjectionContrast();
     }
 }
 
