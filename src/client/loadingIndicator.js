@@ -1,4 +1,6 @@
 class LoadingIndicator {
+    /* Displays status of loading elements on the page */
+    
     constructor() {
         this.loadingTxt = [];
     }

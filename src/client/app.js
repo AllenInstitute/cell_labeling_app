@@ -11,6 +11,7 @@ import {
 
 
 class CellLabelingApp {
+    /* Main App class */
     constructor() {
         this.displayLoginMessage();
         this.addListeners();

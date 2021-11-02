@@ -1,4 +1,14 @@
 function clipImageToQuantiles(img, low_quantile, high_quantile) {
+    /* Clip image to quantiles 
+        Args:
+            - img: Array
+                The img to clip
+            - low_quantile: float
+                low quantile to clip
+            - high_quantile: float
+                high quantile to clip
+
+    */
     low_quantile = parseFloat(low_quantile);
     high_quantile = parseFloat(high_quantile);
 
@@ -17,6 +27,12 @@ function clipImageToQuantiles(img, low_quantile, high_quantile) {
 }
 
 async function bytesToMatrix(blob, dim = [512, 512]) {
+    /* Converts a bytes representation of a matrix to a matrix 
+        Args:
+            -blob: Blob
+            - dim: Array
+                dimension of the matrix
+    */
     let data = await new Response(blob).arrayBuffer();
     data = new Uint16Array(data);
     data = Array.from(data);
@@ -26,6 +42,11 @@ async function bytesToMatrix(blob, dim = [512, 512]) {
 }
 
 function scaleToUint8(X) {
+    /* Scales an input to Uint8 
+        Args:
+            - X: Array
+                The array to scale
+    */
     const max = math.max(X);
     const min = math.min(X);
 
@@ -38,6 +59,10 @@ function scaleToUint8(X) {
 }
 
 function toRGB(X) {
+    /* Converts a grayscale input to 3 channels
+        Args:
+            - X: Array
+    */
     X = X.map(row => {
         return row.map(x => {
             return [x, x, x];
