@@ -1,13 +1,11 @@
 import json
 import random
 from io import BytesIO
-from pathlib import Path
 
 import h5py
 import numpy as np
 from PIL import Image
-from flask import render_template, request, send_file, Blueprint, current_app, \
-    jsonify
+from flask import render_template, request, send_file, Blueprint, current_app
 from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
