@@ -16,28 +16,13 @@ function clipImageToQuantiles(img, low_quantile, high_quantile) {
     return img;
 }
 
-async function bytesToMatrix(blob) {
+async function bytesToMatrix(blob, dim = [512, 512]) {
     let data = await new Response(blob).arrayBuffer();
     data = new Uint16Array(data);
     data = Array.from(data);
     data = math.matrix(data);
+    data = data.reshape(dim);
     return data;
-}
-
-function matrixToArray(data) {
-    const arr = [];
-    let row = [];
-
-    data.forEach((x, i) => {
-        const isNewRow = i[0] % 512 === 0 && i[0] !== 0;
-        if (isNewRow) {
-            arr.push(row);
-            row = [];
-        }
-        row.push(x); 
-    });
-    arr.push(row);
-    return arr;
 }
 
 function scaleToUint8(X) {
@@ -312,7 +297,7 @@ class CellLabelingApp {
             const blob = await data.blob();
             data = await bytesToMatrix(blob);
             
-            data = matrixToArray(data);
+            data = data._data;
             this.projection_raw = data;
             
             if (projection_type !== 'correlation') {
