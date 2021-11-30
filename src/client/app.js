@@ -448,7 +448,10 @@ class CellLabelingApp {
     submitLabel() {
         const url = `http://localhost:${PORT}/add_label`;
         const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
-        const notes = $('#notes').val();
+        let notes = $('#notes').val();
+        if (!notes) {
+            notes = null;
+        }
         const data = {
             experiment_id: this.experiment_id,
             roi_id: this.roi['id'],
