@@ -31,3 +31,4 @@ class UserLabel(db.Model):
     job_roi_id = db.Column(db.Integer, db.ForeignKey(JobRois.id),
                            primary_key=True)
     label = db.Column(db.String, nullable=False)
+    notes = db.Column(db.String, nullable=True)

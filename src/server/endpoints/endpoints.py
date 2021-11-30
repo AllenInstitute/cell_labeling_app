@@ -243,7 +243,7 @@ def add_label():
     roi_id = roi_id[0]
     user_id = current_user.get_id()
     user_label = UserLabel(user_id=user_id, job_roi_id=roi_id,
-                           label=data['label'])
+                           label=data['label'], notes=data['notes'])
     db.session.add(user_label)
     db.session.commit()
 
