@@ -448,15 +448,18 @@ class CellLabelingApp {
     submitLabel() {
         const url = `http://localhost:${PORT}/add_label`;
         const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
+        const notes = $('#notes').val();
         const data = {
             experiment_id: this.experiment_id,
             roi_id: this.roi['id'],
-            label: label
+            label: label,
+            notes
         };
         this.loadingIndicator.add('Submitting...');
         return $.post(url, JSON.stringify(data)).then(() => {
             $('#label_cell').prop('checked', false);
             $('#label_not_cell').prop('checked', false);
+            $('#notes').val(null);
             this.loadingIndicator.remove('Submitting...');
         })
     }
