@@ -46,17 +46,12 @@ class CellLabelingApp {
             this.videoGoToTimesteps();
         });
 
-        $('button#submit_label').on('click', async () => {
-            await this.submitLabel();
-            this.loadNewRoi();
-        });
-
-        $('#label_cell').on('click', () => {
-            $('button#submit_label').attr('disabled', false);
-        });
-
-        $('#label_not_cell').on('click', () => {
-            $('button#submit_label').attr('disabled', false);
+        $('button#submit_label').on('click', () => {
+            this.submitLabel().then(() => {
+                this.loadNewRoi();
+            }).catch(e => {
+                // do nothing
+            });
         });
 
         $('input#projection_contrast_low_quantile, input#projection_contrast_high_quantile').on('input', () => {
@@ -425,6 +420,7 @@ class CellLabelingApp {
         const roi = await this.getRandomRoiFromRandomExperiment()
         .then(roi => {
             this.is_loading_new_roi = false;
+            $('button#submit_label').attr('disabled', false);
             return roi;
         })
         .catch(() => {
@@ -447,6 +443,10 @@ class CellLabelingApp {
 
     submitLabel() {
         const url = `http://localhost:${PORT}/add_label`;
+        if (!($('#label_cell').is(':checked') || $('#label_not_cell').is(':checked'))) {
+            return Promise.reject('label is not checked');
+        }
+        $('button#submit_label').attr('disabled', true);
         const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
         let notes = $('#notes').val();
         if (!notes) {
