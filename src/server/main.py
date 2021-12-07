@@ -48,6 +48,9 @@ if __name__ == '__main__':
              'enable debug level logging')
     parser.add_argument('--log_file', help='Path to log file')
     parser.add_argument('--port', default=5000, help='Port to run app')
+    parser.add_argument('--threads', default=16, help='Number of threads for '
+                                                      'the web server',
+                        type=int)
     args = parser.parse_args()
 
     config_file = Path(args.config_file)
@@ -65,4 +68,4 @@ if __name__ == '__main__':
         app.run(debug=True, port=port)
     else:
         from waitress import serve
-        serve(app, port=port)
+        serve(app, port=port, threads=args.threads)
