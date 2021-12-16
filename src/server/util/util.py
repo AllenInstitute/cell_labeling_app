@@ -2,11 +2,13 @@ import base64
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 
 import cv2
 import h5py
+import matplotlib
 import numpy as np
+import pandas as pd
 from PIL import Image
 from flask import current_app
 
@@ -30,6 +32,23 @@ def _is_roi_within_region(roi: Dict, region: JobRegion,
     return intersection.sum() > 1
 
 
+def _get_soft_filter_roi_color(roi_id: int, experiment_id: str,
+                               color_map='viridis') -> Tuple[int, int, int]:
+    """Gets color based on classifier score for a given ROI in order to draw
+    attention to ROIs the classifier thinks are cells"""
+    cmap = matplotlib.cm.get_cmap(color_map)
+    predictions = pd.read_csv(Path(current_app.config['PREDICTIONS_DIR']) /
+                              f'{experiment_id}_inference.csv',
+                              dtype={'experiment_id': str})
+    predictions = predictions[predictions['experiment_id'] == experiment_id]
+    predictions = predictions.set_index('roi-id')
+
+    classifier_score = predictions.loc[roi_id]['y_score']
+
+    color = tuple([int(255 * x) for x in cmap(classifier_score)][:-1])
+    color = (color[0], color[1], color[2])
+    return color
+
 def convert_pil_image_to_base64(img: Image) -> str:
     buffered = BytesIO()
     img.save(buffered, format="png")
@@ -39,12 +58,15 @@ def convert_pil_image_to_base64(img: Image) -> str:
 
 
 def get_roi_contours(experiment_id: str, region: JobRegion,
-                     reshape_contours_to_list=True):
-    """Gets all ROIs within a given region of the field of view
+                     reshape_contours_to_list=True,
+                     color_map='viridis'):
+    """Gets all ROIs within a given region of the field of view.
     :param experiment_id:
         experiment id
     :param region:
         region to get contours for
+    :param color_map
+        color map used for converting the classifier score into a color
     :param reshape_contours_to_list:
     :return:
         dict with keys
@@ -56,7 +78,6 @@ def get_roi_contours(experiment_id: str, region: JobRegion,
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
     with h5py.File(artifact_path, 'r') as f:
         rois = json.loads((f['rois'][()]))
-        roi_color_map = json.loads(f['roi_color_map'][()])
 
     all_contours = []
 
@@ -79,7 +100,9 @@ def get_roi_contours(experiment_id: str, region: JobRegion,
             contours = [
                 x.reshape(x.shape[0], 2).tolist() for x in contours
             ]
-        color = roi_color_map[str(id)]
+
+        color = _get_soft_filter_roi_color(roi_id=id,
+                                           experiment_id=experiment_id)
         for contour in contours:
             all_contours.append({
                 'contour': contour,
