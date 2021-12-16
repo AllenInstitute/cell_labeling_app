@@ -36,23 +36,20 @@ class User(UserMixin, db.Model):
     id = db.Column(db.String, primary_key=True)
 
 
-class UserRegion(db.Model):
-    """All regions a user has submitted labels for"""
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.String, db.ForeignKey(User.id))
-    region_id = db.Column(db.Integer, db.ForeignKey(JobRegion.id))
-
-
-class UserCell(db.Model):
+class UserCells(db.Model):
     """All ROIs within a region a user has labeled as cell"""
-    user_region_id = db.Column(db.Integer, db.ForeignKey(UserRegion.id),
-                               primary_key=True)
-    roi_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String, db.ForeignKey(User.id), primary_key=True)
+    region_id = db.Column(db.Integer, db.ForeignKey(JobRegion.id),
+                          primary_key=True)
+
+    # json representation
+    cells = db.Column(db.String, primary_key=True)
 
 
 class UserRoi(db.Model):
     """Additional metadata a user has given for an ROI"""
-    user_region_id = db.Column(db.Integer, db.ForeignKey(UserRegion.id),
-                               primary_key=True)
+    user_id = db.Column(db.String, db.ForeignKey(User.id), primary_key=True)
+    region_id = db.Column(db.Integer, db.ForeignKey(JobRegion.id),
+                          primary_key=True)
     roi_id = db.Column(db.Integer, primary_key=True)
     notes = db.Column(db.String)
