@@ -58,8 +58,7 @@ def convert_pil_image_to_base64(img: Image) -> str:
 
 
 def get_roi_contours(experiment_id: str, region: JobRegion,
-                     reshape_contours_to_list=True,
-                     color_map='viridis'):
+                     reshape_contours_to_list=True):
     """Gets all ROIs within a given region of the field of view.
     :param experiment_id:
         experiment id
