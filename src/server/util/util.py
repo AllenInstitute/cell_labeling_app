@@ -64,8 +64,6 @@ def get_roi_contours(experiment_id: str, region: JobRegion,
         experiment id
     :param region:
         region to get contours for
-    :param color_map
-        color map used for converting the classifier score into a color
     :param reshape_contours_to_list:
     :return:
         dict with keys
