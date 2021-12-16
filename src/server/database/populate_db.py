@@ -67,8 +67,12 @@ def _get_all_regions(
     # Starting away from border
     region_x_start, region_y_start = region_width, region_height
 
-    for y in range(region_y_start, fov_height, region_height):
-        for x in range(region_x_start, fov_width, region_width):
+    # Ending away from border
+    region_x_end, region_y_end = fov_width - region_width, \
+        fov_height - region_height
+
+    for y in range(region_y_start, region_y_end, region_height):
+        for x in range(region_x_start, region_x_end, region_width):
             region = Region(x=x, y=y)
             res.append(region)
     return res
