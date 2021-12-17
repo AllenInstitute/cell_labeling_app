@@ -16,9 +16,22 @@ from src.server.database.schemas import JobRegion
 
 
 def _is_roi_within_region(roi: Dict, region: JobRegion,
-                          field_of_view_dimension=(512, 512)):
+                          field_of_view_dimension=(512, 512),
+                          include_overlapping_rois=True):
     """Returns whether an roi is within a region. An ROI is considered
-    within a region if the mask intersects with the region"""
+    within a region if the mask intersects with the region
+    :param roi:
+        Is this ROI within region
+    :param region:
+        The region
+    :param field_of_view_dimension:
+        Field of view dimensions
+    :param include_overlapping_rois:
+        Whether to include ROIs that overlap with region but don't fit
+        entirely within region
+    :return:
+        True if ROI is within region else False
+    """
     region_mask = np.zeros(field_of_view_dimension, dtype='uint8')
     region_mask[region.x:region.x+region.width,
                 region.y:region.y+region.height] = 1
@@ -29,13 +42,18 @@ def _is_roi_within_region(roi: Dict, region: JobRegion,
 
     intersection = roi_mask * region_mask
 
-    return intersection.sum() > 1
+    if include_overlapping_rois:
+        is_within = (intersection == roi_mask).any()
+    else:
+        is_within = (intersection == roi_mask).all()
+    return is_within
 
 
 def _get_soft_filter_roi_color(roi_id: int, experiment_id: str,
                                color_map='viridis') -> Tuple[int, int, int]:
     """Gets color based on classifier score for a given ROI in order to draw
-    attention to ROIs the classifier thinks are cells"""
+    attention to ROIs the classifier thinks are cells. Uses color map
+    defined by color_map"""
     cmap = matplotlib.cm.get_cmap(color_map)
     predictions = pd.read_csv(Path(current_app.config['PREDICTIONS_DIR']) /
                               f'{experiment_id}_inference.csv',
@@ -49,6 +67,7 @@ def _get_soft_filter_roi_color(roi_id: int, experiment_id: str,
     color = (color[0], color[1], color[2])
     return color
 
+
 def convert_pil_image_to_base64(img: Image) -> str:
     buffered = BytesIO()
     img.save(buffered, format="png")
@@ -58,12 +77,16 @@ def convert_pil_image_to_base64(img: Image) -> str:
 
 
 def get_roi_contours(experiment_id: str, region: JobRegion,
+                     include_overlapping_rois=True,
                      reshape_contours_to_list=True):
     """Gets all ROIs within a given region of the field of view.
     :param experiment_id:
         experiment id
     :param region:
         region to get contours for
+    :param include_overlapping_rois:
+        Whether to include ROIs that overlap with region but don't fit
+        entirely within region
     :param reshape_contours_to_list:
     :return:
         dict with keys
@@ -79,7 +102,9 @@ def get_roi_contours(experiment_id: str, region: JobRegion,
     all_contours = []
 
     for roi in rois:
-        if not _is_roi_within_region(roi=roi, region=region):
+        if not _is_roi_within_region(
+                roi=roi, region=region,
+                include_overlapping_rois=include_overlapping_rois):
             continue
 
         mask = roi['mask']
