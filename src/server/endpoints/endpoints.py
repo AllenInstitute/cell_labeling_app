@@ -229,21 +229,13 @@ def get_fov_bounds():
     }
 
 
-@api.route('/add_label', methods=['POST'])
-def add_label():
+@api.route('/submit_cells_for_region', methods=['POST'])
+def submit_cells_for_region():
     data = request.get_json(force=True)
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).first()[0]
-    roi_id = db.session.query(JobRois.id).filter(
-        JobRois.job_id == job_id,
-        JobRois.experiment_id == data['experiment_id'],
-        JobRois.roi_id == int(data['roi_id']))\
-        .first()
-    roi_id = roi_id[0]
     user_id = current_user.get_id()
-    user_label = UserLabel(user_id=user_id, job_roi_id=roi_id,
-                           label=data['label'], notes=data['notes'])
-    db.session.add(user_label)
+    user_cells = UserCells(user_id=user_id, region_id=data['region_id'],
+                           cells=json.dumps(data['cells']))
+    db.session.add(user_cells)
     db.session.commit()
 
     return 'success'
