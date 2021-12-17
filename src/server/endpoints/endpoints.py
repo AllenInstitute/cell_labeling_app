@@ -223,9 +223,15 @@ def get_fov_bounds():
     x = np.array([x['box_x'] for x in contours])
     y = np.array([x['box_y'] for x in contours])
 
+    widths = np.array([x['box_width'] for x in contours])
+    heights = np.array([x['box_height'] for x in contours])
+
+    x_min, x_max = x.min(), (x + widths).max()
+    y_min, y_max = y.min(), (y + heights).max()
+
     return {
-        'x': [float(x.min()), float(x.max())],
-        'y': [float(y.min()), float(y.max())]
+        'x': [float(x_min), float(x_max)],
+        'y': [float(y_min), float(y_max)]
     }
 
 

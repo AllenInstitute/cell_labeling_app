@@ -132,6 +132,8 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
                 'id': id,
                 'box_x': x,
                 'box_y': y,
+                'box_width': width,
+                'box_height': height,
                 'experiment_id': experiment_id
             })
     return all_contours
