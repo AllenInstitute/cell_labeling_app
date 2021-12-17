@@ -43,8 +43,8 @@ def get_roi_contours():
     region = (db.session.query(JobRegion)
               .filter(JobRegion.id == current_region_id)
               .first())
-    all_contours = util.get_roi_contours(experiment_id=experiment_id,
-                                         region=region)
+    all_contours = util.get_roi_contours_in_region(experiment_id=experiment_id,
+                                                   region=region)
     return {
         'contours': all_contours
     }
@@ -206,29 +206,26 @@ def get_default_video_timeframe():
 
 @api.route('/get_fov_bounds', methods=['POST'])
 def get_fov_bounds():
-    roi = request.get_json(force=True)
-    print(roi)
+    """The FOV bounds are the min/max x, y values of the bounding boxes to
+    all ROIs that fit in the region. The reason why the region x, y, width,
+    height was not just used is in the case of ROIs that don't fit within
+    the region entirely. In that case, we need to expand the region
+    dimensions so that all ROIs are in view. """
+    r = request.get_json(force=True)
 
-    (origin,
-     frame_shape) = video_bounds_from_ROI(
-        roi=roi,
-        fov_shape=(512, 512),
-        padding=32)
+    region = (db.session.query(JobRegion)
+              .filter(JobRegion.id == r['region']['id'])
+              .first())
 
-    origin = [float(x) for x in origin]
-    frame_shape = [float(x) for x in frame_shape]
+    contours = util.get_roi_contours_in_region(
+        experiment_id=r['experiment_id'], region=region)
 
-    x_range = [origin[1], origin[1] + frame_shape[1]]
-
-    # Reversing because origin of plot is top-left instead of bottom-left
-    y_range = [origin[0] + frame_shape[0], origin[0]]
-
-    print(x_range)
-    print(y_range)
+    x = np.array([x['box_x'] for x in contours])
+    y = np.array([x['box_y'] for x in contours])
 
     return {
-        'x': x_range,
-        'y': y_range
+        'x': [x.min(), x.max()],
+        'y': [y.min(), y.max()]
     }
 
 

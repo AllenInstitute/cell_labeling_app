@@ -76,9 +76,9 @@ def convert_pil_image_to_base64(img: Image) -> str:
     return img_str
 
 
-def get_roi_contours(experiment_id: str, region: JobRegion,
-                     include_overlapping_rois=True,
-                     reshape_contours_to_list=True):
+def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
+                               include_overlapping_rois=True,
+                               reshape_contours_to_list=True):
     """Gets all ROIs within a given region of the field of view.
     :param experiment_id:
         experiment id
@@ -130,6 +130,8 @@ def get_roi_contours(experiment_id: str, region: JobRegion,
                 'contour': contour,
                 'color': color,
                 'id': id,
+                'box_x': x,
+                'box_y': y,
                 'experiment_id': experiment_id
             })
     return all_contours
