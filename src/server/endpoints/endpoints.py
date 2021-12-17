@@ -14,7 +14,7 @@ from ophys_etl.modules.segmentation.qc_utils.video_utils import \
 from sqlalchemy import desc
 
 from src.server.database.database import db
-from src.server.database.schemas import JobRois, UserLabel, LabelingJob
+from src.server.database.schemas import LabelingJob, JobRegion, UserCells
 from src.server.util import util
 from src.server.util.util import get_artifacts_path
 
@@ -36,68 +36,70 @@ def done():
 
 @api.route('/get_roi_contours')
 def get_roi_contours():
-    experiment_id = request.args.get('experiment_id')
-    current_roi_id = request.args.get('current_roi_id')
-    include_all_contours = request.args.get('include_all_contours') == 'true'
+    experiment_id = request.args['experiment_id']
+    current_region_id = request.args['current_region_id']
+    current_region_id = int(current_region_id)
 
+    region = (db.session.query(JobRegion)
+              .filter(JobRegion.id == current_region_id)
+              .first())
     all_contours = util.get_roi_contours(experiment_id=experiment_id,
-                                         current_roi_id=current_roi_id,
-                                         include_all_rois=include_all_contours)
+                                         region=region)
     return {
         'contours': all_contours
     }
 
 
-@api.route("/get_random_roi")
-def get_random_roi():
+@api.route("/get_random_region")
+def get_random_region():
     # job id is most recently created job id
     job_id = db.session.query(LabelingJob.job_id).order_by(desc(
         LabelingJob.date)).first()[0]
 
-    user_has_labeled = db.session\
-        .query(JobRois.experiment_id.concat('_').concat(JobRois.roi_id))\
-        .join(UserLabel, UserLabel.job_roi_id == JobRois.id)\
-        .filter(JobRois.job_id == job_id, UserLabel.user_id ==
-                current_user.get_id()).all()
+    # Get all region ids user has labeled
+    user_has_labeled = \
+        (db.session
+         .query(UserCells.region_id)
+         .join(JobRegion, JobRegion.id == UserCells.region_id)
+         .filter(JobRegion.job_id == job_id,
+                 UserCells.user_id == current_user.get_id())
+         .all())
 
-    next_roi_candidates = db.session\
-        .query(JobRois.experiment_id, JobRois.roi_id)\
-        .filter(JobRois.job_id == job_id)
+    # Get initial next region candidates query
+    next_region_candidates = \
+        (db.session
+         .query(JobRegion)
+         .filter(JobRegion.job_id == job_id))
 
-    for roi in user_has_labeled:
-        roi = roi[0]
-        next_roi_candidates = next_roi_candidates.filter(
-            JobRois.experiment_id.concat('_').concat(JobRois.roi_id) != roi)
+    # Add filter to next_region_candidates query so user does not label a
+    # region that has already been labeled
+    for region_id in user_has_labeled:
+        region_id = region_id[0]
+        next_region_candidates = next_region_candidates.filter(
+            JobRegion.id != region_id)
 
-    next_roi_candidates = next_roi_candidates.all()
+    next_region_candidates = next_region_candidates.all()
 
-    if not next_roi_candidates:
+    if not next_region_candidates:
+        # No more to label
         return {
             'experiment_id': None,
-            'roi': None
+            'region': None
         }
 
-    next_roi = random.choice(next_roi_candidates)
+    next_region: JobRegion = random.choice(next_region_candidates)
 
-    experiment_id, roi_id = next_roi
-
-    artifact_path = get_artifacts_path(experiment_id=experiment_id)
-    with h5py.File(artifact_path, 'r') as f:
-        rois = json.loads((f['rois'][()]))
-
-    roi = [x for x in rois if x['id'] == roi_id][0]
-
-    roi = {
-        'experiment_id': experiment_id,
-        'id': roi['id'],
-        'x': roi['x'],
-        'y': roi['y'],
-        'width': roi['width'],
-        'height': roi['height']
+    region = {
+        'experiment_id': next_region.experiment_id,
+        'id': next_region.id,
+        'x': next_region.x,
+        'y': next_region.y,
+        'width': next_region.width,
+        'height': next_region.height
     }
     return {
-        'experiment_id': experiment_id,
-        'roi': roi
+        'experiment_id': next_region.experiment_id,
+        'region': region
     }
 
 
