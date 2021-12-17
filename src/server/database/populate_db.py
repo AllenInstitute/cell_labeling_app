@@ -54,25 +54,22 @@ def _get_all_experiments(artifact_dir: Path) -> List[str]:
 
 
 def _get_all_regions(
-        region_dimensions: Tuple[int, int]) -> List[Region]:
+        region_dimensions: Tuple[int, int],
+        border_offset: int) -> List[Region]:
     """Gets list of all possible regions in a field of view
     by evenly dividing the field of view into equally spaced regions
     :param region_dimensions:
         Region dimensions (width x height)
+    :param border_offset
+        Offset to apply so that regions are only sampled this distance away
+        from the border
     """
     res = []
     fov_width, fov_height = FIELD_OF_VIEW_DIMENSIONS
     region_width, region_height = region_dimensions
 
-    # Starting away from border
-    region_x_start, region_y_start = region_width, region_height
-
-    # Ending away from border
-    region_x_end, region_y_end = fov_width - region_width, \
-        fov_height - region_height
-
-    for y in range(region_y_start, region_y_end, region_height):
-        for x in range(region_x_start, region_x_end, region_width):
+    for y in range(border_offset, fov_height - border_offset, region_height):
+        for x in range(border_offset, fov_width - border_offset, region_width):
             region = Region(x=x, y=y)
             res.append(region)
     return res
@@ -80,15 +77,20 @@ def _get_all_regions(
 
 def _get_all_experiment_regions(
         artifact_dir: Path,
-        region_dimensions: Tuple[int, int]) -> List[str]:
+        region_dimensions: Tuple[int, int],
+        border_offset: int) -> List[str]:
     """Returns list of all experiment-region combinations in string form
     :param artifact_dir:
         Path to artifact hdf5 files
     :param region_dimensions:
         Region dimensions (width x height)
+    :param border_offset
+        Offset to apply so that regions are only sampled this distance away
+        from the border
     """
     experiments = _get_all_experiments(artifact_dir=artifact_dir)
-    regions = _get_all_regions(region_dimensions=region_dimensions)
+    regions = _get_all_regions(region_dimensions=region_dimensions,
+                               border_offset=border_offset)
 
     res = []
     for experiment in experiments:
@@ -98,7 +100,8 @@ def _get_all_experiment_regions(
 
 
 def populate_labeling_job(app: Flask, db, n: int,
-                          region_dimensions: Tuple[int, int]):
+                          region_dimensions: Tuple[int, int],
+                          border_offset: int):
     """
     Creates a new labeling job by randomly sampling n total regions from all
     available experiments
@@ -110,6 +113,9 @@ def populate_labeling_job(app: Flask, db, n: int,
         Number of regions in this job
     :param region_dimensions:
         Size (width x height) of each region to sample
+    :param border_offset
+        Offset to apply so that regions are only sampled this distance away
+        from the border
     :return:
         None. Inserts records into the DB
     """
@@ -120,7 +126,7 @@ def populate_labeling_job(app: Flask, db, n: int,
 
     all_experiments_and_regions = _get_all_experiment_regions(
         artifact_dir=Path(app.config['ARTIFACT_DIR']),
-        region_dimensions=region_dimensions)
+        region_dimensions=region_dimensions, border_offset=border_offset)
 
     regions = np.random.choice(all_experiments_and_regions, size=n,
                                replace=False)
@@ -155,6 +161,9 @@ if __name__ == '__main__':
                             help='Region width', type=int)
         parser.add_argument('--region_height', required=True,
                             help='Region height', type=int)
+        parser.add_argument('--border_offset', default=0, type=int,
+                            help='Offset to apply so that regions are only '
+                                 'sampled this distance away from the border')
         args = parser.parse_args()
         n = int(args.n)
 
@@ -173,6 +182,7 @@ if __name__ == '__main__':
         app = create_app(config_file=config_path)
         app.app_context().push()
         populate_labeling_job(app=app, db=db, n=n,
-                              region_dimensions=region_dimension)
+                              region_dimensions=region_dimension,
+                              border_offset=args.border_offset)
 
     main()
