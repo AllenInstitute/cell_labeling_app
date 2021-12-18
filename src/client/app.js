@@ -43,7 +43,7 @@ class CellLabelingApp {
 
         $('button#submit_label').on('click', () => {
             this.submitLabel().then(() => {
-                this.loadNewRoi();
+                this.loadNewRegion();
             }).catch(e => {
                 // do nothing
             });
@@ -60,31 +60,31 @@ class CellLabelingApp {
         })
     }
 
-    async getRandomRoiFromRandomExperiment() {
-        const roi = await $.get(`http://localhost:${PORT}/get_random_roi`, data => {
-            let roi;
-            if (data['roi'] === null) {
-                // No more rois to label
+    async getRandomRegionFromRandomExperiment() {
+        const region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
+            let region;
+            if (data['region'] === null) {
+                // No more regions to label
                 window.location = `http://localhost:${PORT}/done.html`;
             } else {
                 this.experiment_id = data['experiment_id'];
-                this.roi = data['roi'];
-                roi = this.roi;
+                this.region = data['region'];
+                region = this.region;
             }
-            return roi;
+            return region;
         });
         
-        if (roi['roi'] !== null) {
-            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.roi));
+        if (region['region'] !== null) {
+            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.region));
             this.fovBounds = fovBounds;
         }
 
-        return roi;
+        return region;
 
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.region['id']}`;
         this.loadingIndicator.add('Loading trace...');
 
         return $.get(url, data => {
@@ -119,16 +119,16 @@ class CellLabelingApp {
         let roi_contours = this.roi_contours;
 
         if (roi_contours === null) {
-            this.loadingIndicator.add('Loading current roi contour...');
+            this.loadingIndicator.add('Loading ROI contours within region...');
             $("#projection_include_mask_outline").attr("disabled", true);
-            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
+            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
             await $.get(url, data => {
                 roi_contours = data['contours'];
     
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
 
-                this.loadingIndicator.remove('Loading current roi contour...');
+                this.loadingIndicator.remove('Loading ROI contours within region...');
             });
         }
 
@@ -152,15 +152,7 @@ class CellLabelingApp {
             });
         });
         const pathStrings = paths.map(x => x.join(' '));
-        const colors = roi_contours.map(obj => {
-            let color;
-            if (obj['id'] == this.roi['id']) {
-                color = [255, 0, 0];
-            } else {
-                color = obj['color'];
-            }
-            return color;
-        });
+        const colors = roi_contours.map(obj => obj['color']);
         
         const shapes = _.zip(pathStrings, colors).map(obj => {
             const [path, color] = obj;
@@ -272,7 +264,7 @@ class CellLabelingApp {
         let videoTimeframe = this.videoTimeframe;
 
         if (videoTimeframe === null) {
-            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
+            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.region['id']}`)
             .then(async data => await data.json())
             .then(data => {
                 videoTimeframe = data['timeframe'];
@@ -284,7 +276,7 @@ class CellLabelingApp {
         const url = `http://localhost:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
-            roi_id: this.roi['id'],
+            roi_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
@@ -341,9 +333,7 @@ class CellLabelingApp {
 
     displayArtifacts() {
         return Promise.all([
-            this.displayVideo(),
-            this.displayProjection(),
-            this.displayTrace()
+            this.displayProjection()
         ]);
     }
 
@@ -359,31 +349,31 @@ class CellLabelingApp {
         this.experiment_id = null;
         this.projection_is_shown = false;
         this.projection_raw = null;
-        this.roi = null;
-        this.is_loading_new_roi = false;
+        this.region = null;
+        this.is_loading_new_region = false;
         this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
     }
 
-    async loadNewRoi() {
+    async loadNewRegion() {
         $('#movie').remove();
         this.initialize();
-        this.is_loading_new_roi = true;
+        this.is_loading_new_region = true;
         $('#loading_text').css('display', 'inline');
 
-        const roi = await this.getRandomRoiFromRandomExperiment()
-        .then(roi => {
-            this.is_loading_new_roi = false;
+        const region = await this.getRandomRegionFromRandomExperiment()
+        .then(region => {
+            this.is_loading_new_region = false;
             $('button#submit_label').attr('disabled', false);
-            return roi;
+            return region;
         })
         .catch(() => {
             $('#loading_text').hide();
 
             let alert = `
                 <div class="alert alert-danger fade show" role="alert" style="margin-top: 20px" id="alert-error">
-                    Error loading ROI
+                    Error loading region
                 </div>`;
             alert = $(alert);
 
@@ -391,7 +381,7 @@ class CellLabelingApp {
             
             setTimeout(() => $('#alert-error').alert('close'), 10000);
         });
-        if (roi['roi'] !== null) {
+        if (region['region'] !== null) {
             this.displayArtifacts();
         }
     }
@@ -409,7 +399,7 @@ class CellLabelingApp {
         }
         const data = {
             experiment_id: this.experiment_id,
-            roi_id: this.roi['id'],
+            roi_id: this.region['id'],
             label: label,
             notes
         };
@@ -465,5 +455,5 @@ class CellLabelingApp {
 
 $( document ).ready(async function() {
     const app = new CellLabelingApp();
-    app.loadNewRoi();
+    app.loadNewRegion();
 });
