@@ -214,7 +214,7 @@ def get_fov_bounds():
     r = request.get_json(force=True)
 
     region = (db.session.query(JobRegion)
-              .filter(JobRegion.id == r['region']['id'])
+              .filter(JobRegion.id == r['id'])
               .first())
 
     contours = util.get_roi_contours_in_region(
