@@ -19,7 +19,7 @@ class CellLabelingApp {
 
     addListeners() {
         $('#projection_include_mask_outline').on('click', () => {
-            this.show_current_roi_outline_on_projection = !this.show_current_roi_outline_on_projection;
+            this.show_current_region_roi_contours_on_projection = !this.show_current_region_roi_contours_on_projection;
             this.toggleContoursOnProjection();
         });
 
@@ -124,7 +124,9 @@ class CellLabelingApp {
             const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
             await $.get(url, data => {
                 roi_contours = data['contours'];
-    
+                roi_contours = roi_contours.filter(x => x['contour'].length > 0);
+                this.roi_contours = roi_contours;
+
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
 
@@ -132,7 +134,10 @@ class CellLabelingApp {
             });
         }
 
-        roi_contours = roi_contours.filter(x => x['contour'].length > 0);
+        if (!this.show_current_region_roi_contours_on_projection) {
+            roi_contours = [];
+        }
+
 
         const paths = roi_contours.map(obj => {
             return obj['contour'].map((coordinate, index) => {
@@ -159,7 +164,7 @@ class CellLabelingApp {
             return {
                 type: 'polyline',
                 path: path,
-                opacity: 0.75,
+                opacity: 0.9,
                 line: {
                   color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
                 }
@@ -338,7 +343,7 @@ class CellLabelingApp {
     }
 
     initialize() {
-        this.show_current_roi_outline_on_projection = $('#projection_include_mask_outline').is(':checked');
+        this.show_current_region_roi_contours_on_projection = $('#projection_include_mask_outline').is(':checked');
         this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
         this.show_all_roi_outlines_on_movie = $('#video_include_surrounding_rois').is(':checked');
         this.is_trace_shown = false;
