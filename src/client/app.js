@@ -23,11 +23,6 @@ class CellLabelingApp {
             this.toggleContoursOnProjection();
         });
 
-        $('#projection_include_surrounding_rois').on('click', () => {
-            this.show_all_roi_outlines_on_projection = !this.show_all_roi_outlines_on_projection;
-            this.toggleContoursOnProjection();
-        });
-
         $('#projection_type').on('change', () => {
             this.displayProjection();            
         });
@@ -136,17 +131,8 @@ class CellLabelingApp {
                 this.loadingIndicator.remove('Loading current roi contour...');
             });
         }
-        
-        if (!this.show_all_roi_outlines_on_projection) {
-            roi_contours = roi_contours.filter(x => x['id'] == this.roi['id']);
-        } 
-        
-        if (!this.show_current_roi_outline_on_projection) {
-            roi_contours = roi_contours.filter(x => x['id'] != this.roi['id']);
-        }
 
         roi_contours = roi_contours.filter(x => x['contour'].length > 0);
-
 
         const paths = roi_contours.map(obj => {
             return obj['contour'].map((coordinate, index) => {
@@ -189,29 +175,6 @@ class CellLabelingApp {
         });
 
         Plotly.relayout('projection', {'shapes': shapes});
-        
-        if (this.roi_contours === null) {
-            $("#projection_include_surrounding_rois").attr("disabled", true);
-
-            // Now load all contours in background
-            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
-            this.loadingIndicator.add('Loading all roi contours...');
-            return $.get(url, data => {
-
-                // Make sure this request is not from some previous ROI
-                if (!this.is_loading_new_roi && data['contours'][0]['experiment_id'] === this.roi['experiment_id']) {
-                    this.roi_contours = data['contours'];
-
-                    if (this.show_all_roi_outlines_on_projection) {
-                        this.toggleContoursOnProjection();
-                    }
-                    $("#projection_include_surrounding_rois").attr("disabled", false);
-                    this.loadingIndicator.remove('Loading all roi contours...');
-                }
-            });
-        }
-
-        return;
     }
 
     async displayProjection() {
@@ -220,7 +183,6 @@ class CellLabelingApp {
         // Disable projection settings until loaded
         $('#projection_type').attr('disabled', true);
         $("#projection_include_mask_outline").attr("disabled", true);
-        $("#projection_include_surrounding_rois").attr("disabled", true);
         $('#projection_contrast').attr('disabled', true);
         $('button#projection_contrast_reset').attr('disabled', true);
         $('input#projection_contrast_low_quantile').attr('disabled', true);
@@ -284,15 +246,9 @@ class CellLabelingApp {
             $('input#projection_contrast_low_quantile').attr('disabled', false);
             $('input#projection_contrast_high_quantile').attr('disabled', false);
 
-            if (this.roi_contours !== null) {
-                $("#projection_include_surrounding_rois").attr("disabled", false);
-            }
-
             this.loadingIndicator.remove('Loading projection...');
 
-            this.toggleContoursOnProjection().then(() => {
-                $("#projection_include_surrounding_rois").attr("disabled", false);
-            });
+            this.toggleContoursOnProjection();
 
             this.updateProjectionContrast();
         });
@@ -393,7 +349,6 @@ class CellLabelingApp {
 
     initialize() {
         this.show_current_roi_outline_on_projection = $('#projection_include_mask_outline').is(':checked');
-        this.show_all_roi_outlines_on_projection = $('#projection_include_surrounding_rois').is(':checked');
         this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
         this.show_all_roi_outlines_on_movie = $('#video_include_surrounding_rois').is(':checked');
         this.is_trace_shown = false;
