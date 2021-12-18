@@ -209,7 +209,9 @@ class CellLabelingApp {
         
             const trace1 = {
                 z: data,
-                type: 'image'
+                type: 'image',
+                // disable hover tooltip
+                hoverinfo: 'none'
             };
         
             if (this.projection_is_shown) {
@@ -456,7 +458,9 @@ class CellLabelingApp {
 
         const trace1 = {
             z: x,
-            type: 'image'
+            type: 'image',
+            // disable hover tooltip
+            hoverinfo: 'none'
         };
 
         const layout = document.getElementById('projection').layout;
