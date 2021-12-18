@@ -6,7 +6,7 @@ from typing import Dict, Tuple
 
 import cv2
 import h5py
-import matplotlib
+import matplotlib.cm
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -43,7 +43,7 @@ def _is_roi_within_region(roi: Dict, region: JobRegion,
     intersection = roi_mask * region_mask
 
     if include_overlapping_rois:
-        is_within = (intersection == roi_mask).any()
+        is_within = intersection.sum() > 1
     else:
         is_within = (intersection == roi_mask).all()
     return is_within
