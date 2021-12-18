@@ -161,14 +161,18 @@ class CellLabelingApp {
             return this.cells.has(obj['id']) ? [255, 0, 0] : obj['color'];
         });
         
-        const shapes = _.zip(pathStrings, colors).map(obj => {
+        const shapes = _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
+            const line_width = (roi_contours[i]['id'] === this.selected_roi) | 
+                               (this.cells.has(roi_contours[i]['id'])) 
+                               ? 4 : 2;
             return {
                 type: 'polyline',
                 path: path,
                 opacity: 1.0,
                 line: {
-                  color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+                    width: line_width,
+                    color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
                 }
             }
         });
@@ -369,6 +373,7 @@ class CellLabelingApp {
         this.region = null;
         this.is_loading_new_region = false;
         this.cells = new Set();
+        this.selected_roi = null;
         this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
@@ -459,7 +464,7 @@ class CellLabelingApp {
         const trace1 = {
             z: x,
             type: 'image',
-            // disable hover tooltip
+            // disable hover tooltip 
             hoverinfo: 'none'
         };
 
@@ -491,14 +496,17 @@ class CellLabelingApp {
                 // ROI not clicked. do nothing
             });
         
-        if (this.cells.has(res['roi_id'])) {
-            // Deselect
+        if (this.selected_roi === res['roi_id']) {
+            // Transition to "cell"
+            this.cells.add(res['roi_id']);
+            this.selected_roi = null;
+        } else if (this.cells.has(res['roi_id'])) {
+            // Transition to "not cell"
             this.cells.delete(res['roi_id']);
         } else {
-            // Select
-            this.cells.add(res['roi_id']);
+            this.selected_roi = res['roi_id'];
         }
-
+        
         // Redraw the contours
         this.toggleContoursOnProjection();
 
