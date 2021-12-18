@@ -247,6 +247,67 @@ def submit_cells_for_region():
     return 'success'
 
 
+@api.route('/find_roi_at_coordinates', methods=['POST'])
+def find_roi_at_coordinates():
+    """
+    Finds ROI id at field of view x, y coordinates
+    from a set of candidate rois
+
+    Request body
+    -------------
+    - current_region_id:
+        Currently displayed region id
+    - roi_ids
+        All roi ids in the currently displayed region
+    - coordinates
+        x, y coordinates in field of view at which to find roi
+
+    :return:
+        json containing roi id at coordinates
+    """
+    data = request.get_json(force=True)
+
+    current_region_id = data['current_region_id']
+    rois_in_region = data['roi_ids']
+    x, y = data['coordinates']
+
+    region = (db.session.query(JobRegion)
+              .filter(JobRegion.id == current_region_id)
+              .first())
+
+    artifact_path = get_artifacts_path(experiment_id=region.experiment_id)
+    with h5py.File(artifact_path, 'r') as f:
+        rois = json.loads((f['rois'][()]))
+
+    # 1) First limit candidate rois to rois in region
+    rois = [x for x in rois if x['id'] in rois_in_region]
+
+    # 2) Then limit candidate rois to rois whose bounding boxes intersect
+    # with coordinates
+    rois = [roi for roi in rois if
+            (roi['x'] <= x <= roi['x'] + roi['width']) and
+            (roi['y'] <= y <= roi['y'] + roi['height'])]
+
+    # 3) Detect in a greedy fashion which of the candidate ROIs has a point
+    # at coordinates
+    for roi in rois:
+        roi_x = roi['x']
+        roi_y = roi['y']
+        roi_width = roi['width']
+        roi_height = roi['height']
+
+        roi_mask = np.zeros(current_app.config['FIELD_OF_VIEW_DIMENSIONS'],
+                            dtype='uint8')
+        roi_mask[roi_y:roi_y+roi_height, roi_x:roi_x+roi_width] = roi['mask']
+
+        if roi_mask[y, x] == 1:
+            return {
+                'roi_id': roi['id']
+            }
+
+    return f'No ROI found at {x, y}', 400
+
+
 @api.after_request
 def after_request(response):
     header = response.headers

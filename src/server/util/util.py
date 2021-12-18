@@ -68,6 +68,54 @@ def _get_soft_filter_roi_color(roi_id: int, experiment_id: str,
     return color
 
 
+def get_rois_in_region(region: JobRegion,
+                       include_overlapping_rois=True):
+    """Gets all ROIs within a given region of the field of view.
+    :param experiment_id:
+        experiment id
+    :param region:
+        region to get contours for
+    :param include_overlapping_rois:
+        Whether to include ROIs that overlap with region but don't fit
+        entirely within region
+    :return:
+        dict with keys
+            - mask: boolean array of size width x height
+            - x: upper left x coordinate of roi bounding box
+            - y: upper left y coordinate of roi bounding box
+            - width: roi bounding box width
+            - height: roi bounding box height
+            - id: roi id
+    """
+    artifact_path = get_artifacts_path(experiment_id=region.experiment_id)
+    with h5py.File(artifact_path, 'r') as f:
+        rois = json.loads((f['rois'][()]))
+
+    res = []
+    for roi in rois:
+        if not _is_roi_within_region(
+                roi=roi, region=region,
+                include_overlapping_rois=include_overlapping_rois):
+            continue
+
+        mask = roi['mask']
+        x = roi['x']
+        y = roi['y']
+        width = roi['width']
+        height = roi['height']
+        id = roi['id']
+
+        res.append({
+            'mask': mask,
+            'x': x,
+            'y': y,
+            'width': width,
+            'height': height,
+            'id': id
+        })
+    return res
+
+
 def convert_pil_image_to_base64(img: Image) -> str:
     buffered = BytesIO()
     img.save(buffered, format="png")
@@ -79,7 +127,7 @@ def convert_pil_image_to_base64(img: Image) -> str:
 def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
                                include_overlapping_rois=True,
                                reshape_contours_to_list=True):
-    """Gets all ROIs within a given region of the field of view.
+    """Gets all ROI contours within a given region of the field of view.
     :param experiment_id:
         experiment id
     :param region:
@@ -95,23 +143,17 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
             - id: roi id
             - experiment_id: experiment id
     """
-    artifact_path = get_artifacts_path(experiment_id=experiment_id)
-    with h5py.File(artifact_path, 'r') as f:
-        rois = json.loads((f['rois'][()]))
-
     all_contours = []
 
-    for roi in rois:
-        if not _is_roi_within_region(
-                roi=roi, region=region,
-                include_overlapping_rois=include_overlapping_rois):
-            continue
+    rois = get_rois_in_region(
+        region=region, include_overlapping_rois=include_overlapping_rois)
 
-        mask = roi['mask']
+    for roi in rois:
         x = roi['x']
         y = roi['y']
         width = roi['width']
         height = roi['height']
+        mask = roi['mask']
         id = roi['id']
 
         blank = np.zeros((512, 512), dtype='uint8')

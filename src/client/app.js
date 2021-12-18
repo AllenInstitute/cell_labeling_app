@@ -57,7 +57,7 @@ class CellLabelingApp {
 
         $('button#projection_contrast_reset').on('click', () => {
             this.resetProjectionContrast();
-        })
+        });
     }
 
     async getRandomRegionFromRandomExperiment() {
@@ -157,14 +157,16 @@ class CellLabelingApp {
             });
         });
         const pathStrings = paths.map(x => x.join(' '));
-        const colors = roi_contours.map(obj => obj['color']);
+        const colors = roi_contours.map(obj => {
+            return this.cells.has(obj['id']) ? [255, 0, 0] : obj['color'];
+        });
         
         const shapes = _.zip(pathStrings, colors).map(obj => {
             const [path, color] = obj;
             return {
                 type: 'polyline',
                 path: path,
-                opacity: 0.9,
+                opacity: 1.0,
                 line: {
                   color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
                 }
@@ -233,6 +235,14 @@ class CellLabelingApp {
 
                 Plotly.newPlot('projection', [trace1], layout).then(() => {
                     this.projection_is_shown = true;
+                });
+                
+                const projection = document.getElementById('projection');
+
+                projection.on('plotly_click', data => {
+                    const point  = data.points[0];
+                    const [y, x] = point.pointIndex;
+                    this.handleProjectionClick(x, y);
                 });
             }
             
@@ -356,6 +366,7 @@ class CellLabelingApp {
         this.projection_raw = null;
         this.region = null;
         this.is_loading_new_region = false;
+        this.cells = new Set();
         this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
@@ -455,6 +466,38 @@ class CellLabelingApp {
 
     resetProjectionContrast() {
         this.updateProjectionContrast();
+    }
+
+    async handleProjectionClick(x, y) {
+        /* 
+        Args
+        ------
+        - x: x coordinate in fov of click
+        - y: y coordinate in fov of click
+        */
+        let postData = {
+            current_region_id: this.region['id'],
+            roi_ids: this.roi_contours.map(roi => roi['id']),
+            coordinates: [x, y]
+        }
+        postData = JSON.stringify(postData);
+
+        const res = await $.post(`http://localhost:${PORT}/find_roi_at_coordinates`, postData)
+            .catch(() => {
+                // ROI not clicked. do nothing
+            });
+        
+        if (this.cells.has(res['roi_id'])) {
+            // Deselect
+            this.cells.delete(res['roi_id']);
+        } else {
+            // Select
+            this.cells.add(res['roi_id']);
+        }
+
+        // Redraw the contours
+        this.toggleContoursOnProjection();
+
     }
 }
 
