@@ -180,6 +180,10 @@ if __name__ == '__main__':
         config_path = Path(args.config_path)
 
         app = create_app(config_file=config_path)
+        if not Path(app.config['SQLALCHEMY_DATABASE_URI']
+                    .replace('sqlite:///', '')).is_file():
+            with app.app_context():
+                db.create_all()
         app.app_context().push()
         populate_labeling_job(app=app, db=db, n=n,
                               region_dimensions=region_dimension,

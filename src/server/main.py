@@ -31,11 +31,6 @@ def create_app(config_file: Path, port=5000):
     return app
 
 
-def setup_database(app: Flask):
-    with app.app_context():
-        db.create_all()
-
-
 if __name__ == '__main__':
     import argparse
 
@@ -57,9 +52,6 @@ if __name__ == '__main__':
     port = int(args.port)
 
     app = create_app(config_file=config_file, port=port)
-    if not Path(app.config['SQLALCHEMY_DATABASE_URI']
-                .replace('sqlite:///', '')).is_file():
-        setup_database(app=app)
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(filename=args.log_file, level=log_level)
