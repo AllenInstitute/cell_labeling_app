@@ -53,34 +53,6 @@
             </nav>
             <div class="row">
                 <div class="col">
-                    <div style="margin-top: 30px;">
-                        <div id="video_container" style="width: 452px; height: 452px">
-                        </div>
-                        <div id="video_settings">
-                            <h4 id="timestep_display"></h4>
-                            <div class="form-check form-check-inline mt-4">
-                                <input type="checkbox" class="form-check-input"
-                                    id="video_include_mask_outline" checked>
-                                <label class="form-check-label" for="video_include_mask_outline">
-                                    include mask outline
-                                </label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input type="checkbox" class="form-check-input form-check-inline"
-                                    id="video_include_surrounding_rois">
-                                <label class="form-check-label" for="video_include_surrounding_rois">
-                                    include surrounding ROIs
-                                </label>
-                            </div>
-                            <div class="mt-4">
-                                <button class="btn btn-light" id="trim_video_to_timeframe">
-                                    Go to trace timesteps
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col">
                     <div id="projection_container">
                         <div id="projection" style="width: 512px; height: 512px"></div>
                         <div id="projection_settings" style="margin-left: 30px">
@@ -125,6 +97,34 @@
                                         Reset
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div style="margin-top: 30px;">
+                        <div id="video_container" style="width: 452px; height: 452px">
+                        </div>
+                        <div id="video_settings">
+                            <h4 id="timestep_display"></h4>
+                            <div class="form-check form-check-inline mt-4">
+                                <input type="checkbox" class="form-check-input"
+                                    id="video_include_mask_outline" checked>
+                                <label class="form-check-label" for="video_include_mask_outline">
+                                    include mask outline
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input type="checkbox" class="form-check-input form-check-inline"
+                                    id="video_include_surrounding_rois">
+                                <label class="form-check-label" for="video_include_surrounding_rois">
+                                    include surrounding ROIs
+                                </label>
+                            </div>
+                            <div class="mt-4">
+                                <button class="btn btn-light" id="trim_video_to_timeframe">
+                                    Go to trace timesteps
+                                </button>
                             </div>
                         </div>
                     </div>
