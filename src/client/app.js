@@ -58,6 +58,10 @@ class CellLabelingApp {
         $('button#projection_contrast_reset').on('click', () => {
             this.resetProjectionContrast();
         });
+
+        $('#roi-display-video-and-trace').click(() => {
+            this.displayArtifacts({includeProjection: false, includeVideo: true, includeTrace: true});
+        });
     }
 
     async getRandomRegionFromRandomExperiment() {
@@ -84,7 +88,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.region['id']}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`;
         this.loadingIndicator.add('Loading trace...');
 
         return $.get(url, data => {
@@ -283,7 +287,7 @@ class CellLabelingApp {
         let videoTimeframe = this.videoTimeframe;
 
         if (videoTimeframe === null) {
-            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.region['id']}`)
+            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
             .then(async data => await data.json())
             .then(data => {
                 videoTimeframe = data['timeframe'];
@@ -295,7 +299,7 @@ class CellLabelingApp {
         const url = `http://localhost:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
-            roi_id: this.region['id'],
+            roi_id: this.selected_roi,
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
@@ -350,10 +354,21 @@ class CellLabelingApp {
         this.displayVideo();
     }
 
-    displayArtifacts() {
-        return Promise.all([
-            this.displayProjection()
-        ]);
+    displayArtifacts({includeProjection = true, includeVideo = false, includeTrace = false} = {}) {
+        const artifactLoaders = [];
+        if (includeProjection) {
+            artifactLoaders.push(this.displayProjection());
+        }
+
+        if (includeVideo) {
+            artifactLoaders.push(this.displayVideo());
+        }
+
+        if (includeTrace) {
+            artifactLoaders.push(this.displayTrace());
+        }
+
+        return Promise.all(artifactLoaders);
     }
 
     initialize() {
@@ -375,6 +390,11 @@ class CellLabelingApp {
         this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
+
+        // Disable all the video settings (video not loaded yet)
+        $('#video_include_mask_outline').attr("disabled", true);
+        $('#video_include_surrounding_rois').attr("disabled", true);
+        $('#trim_video_to_timeframe').attr("disabled", true);
     }
 
     async loadNewRegion() {
