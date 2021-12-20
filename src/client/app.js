@@ -300,6 +300,7 @@ class CellLabelingApp {
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.selected_roi,
+            region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,

@@ -67,8 +67,8 @@ def _get_classifier_score_for_roi(roi_id: int, experiment_id: str):
     return classifier_score
 
 
-def _get_soft_filter_roi_color(classifier_score: float,
-                               color_map='viridis') -> Tuple[int, int,
+def get_soft_filter_roi_color(classifier_score: float,
+                              color_map='viridis') -> Tuple[int, int,
                                                                  int]:
     """Gets color based on classifier score for a given ROI in order to draw
     attention to ROIs the classifier thinks are cells. Uses color map
@@ -187,7 +187,7 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
                 x.reshape(x.shape[0], 2).tolist() for x in contours
             ]
 
-        color = _get_soft_filter_roi_color(
+        color = get_soft_filter_roi_color(
             classifier_score=roi['classifier_score'])
         for contour in contours:
             all_contours.append({

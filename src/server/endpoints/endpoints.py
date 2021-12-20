@@ -154,6 +154,7 @@ def get_video():
     request_data = request.get_json(force=True)
     experiment_id = request_data['experiment_id']
     roi_id = int(request_data['roi_id'])
+    region_id = int(request_data['region_id'])
     include_current_roi_mask = request_data['include_current_roi_mask']
     include_all_roi_masks = request_data['include_all_roi_masks']
     padding = int(request_data.get('padding', 32))
@@ -163,17 +164,19 @@ def get_video():
 
     with h5py.File(artifact_path, 'r') as f:
         video_generator = VideoGenerator(video_data=f['video_data'][()])
-        rois = json.loads(f['rois'][()])
-        roi_color_map = json.loads(f['roi_color_map'][()])
-        roi_color_map = {int(roi_id): tuple(roi_color_map[roi_id])
-                         for roi_id in roi_color_map}
 
-    this_roi = rois[roi_id]
+    region = (db.session.query(JobRegion)
+              .filter(JobRegion.id == region_id)
+              .first())
+    rois = util.get_rois_in_region(region=region)
+    roi_color_map = {
+        roi['id']: util.get_soft_filter_roi_color(
+            classifier_score=roi['classifier_score']) for roi in rois}
+
+    this_roi = [x for x in rois if x['id'] == roi_id][0]
     timesteps = np.arange(start, end)
 
-    if include_current_roi_mask:
-        roi_color_map[roi_id] = (255, 0, 0)
-    else:
+    if not include_current_roi_mask:
         roi_color_map = None
 
     roi_list = rois if include_all_roi_masks else None
