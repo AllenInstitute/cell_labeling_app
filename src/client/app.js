@@ -504,17 +504,18 @@ class CellLabelingApp {
             }
         }
 
-        if (this.selected_roi !== res['roi_id'] | !this.cells.has(res['roi_id'])) {
+        if (this.selected_roi === res['roi_id'] & !this.cells.has(res['roi_id'])) {
             // Transition to "cell"
             labelText = 'Cell';
             this.cells.add(res['roi_id']);
-            this.selected_roi = res['roi_id'];
-            $('#roi-sidenav p#this-roi').text(`ROI ${this.selected_roi}`);
-            $('#roi-sidenav > *').attr('disabled', false);
-            $('#roi-sidenav #notes').attr('disabled', false);
         } else if (this.cells.has(res['roi_id'])) {
             // Transition to "not cell"
             this.cells.delete(res['roi_id']);
+        } else {
+            // Select ROI
+            this.selected_roi = res['roi_id'];
+            $('#roi-sidenav > *').attr('disabled', false);
+            $('#roi-sidenav #notes').attr('disabled', false);
         }
 
         $('#roi-sidenav #roi-label').text(labelText);
