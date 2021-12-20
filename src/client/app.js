@@ -509,11 +509,23 @@ class CellLabelingApp {
             coordinates: [x, y]
         }
         postData = JSON.stringify(postData);
-
-        const res = await $.post(`http://localhost:${PORT}/find_roi_at_coordinates`, postData)
-            .catch(() => {
-                // ROI not clicked. do nothing
+        
+        
+        const res = await fetch(`http://localhost:${PORT}/find_roi_at_coordinates`, 
+            {   method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: postData
+            }).then(response => {
+                return response.json();
             });
+        
+        if (res['roi_id'] === null) {
+            // No ROI clicked. Do nothing
+            return;
+        }
+
         let labelText = 'Not Cell';
         
         const getClassifierProbabilityTextColor = () => {

@@ -310,7 +310,9 @@ def find_roi_at_coordinates():
                 'roi_id': roi['id']
             }
 
-    return f'No ROI found at {x, y}', 400
+    return {
+        'roi_id': None
+    }
 
 
 @api.after_request
