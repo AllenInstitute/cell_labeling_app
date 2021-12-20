@@ -515,6 +515,7 @@ class CellLabelingApp {
         } else {
             // Select ROI
             this.selected_roi = res['roi_id'];
+            $('#roi-sidenav #this-roi').text(`ROI ${this.selected_roi}`);
             $('#roi-sidenav > *').attr('disabled', false);
             $('#roi-sidenav #notes').attr('disabled', false);
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
