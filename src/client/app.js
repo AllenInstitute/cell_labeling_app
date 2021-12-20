@@ -502,7 +502,7 @@ class CellLabelingApp {
 
         const getClassifierScore = () => {
             const score = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['classifier_score'];
-            return score.toPrecision(2);
+            return score.toFixed(2);
         }
 
         if (this.selected_roi === res['roi_id'] & !this.cells.has(res['roi_id'])) {
