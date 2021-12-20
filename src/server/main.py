@@ -25,7 +25,6 @@ def create_app(config_file: Path, port=5000):
     app.config['PORT'] = port
     app.config['FIELD_OF_VIEW_DIMENSIONS'] = (512, 512)
     db.init_app(app)
-    app.register_blueprint(api)
     app.register_blueprint(users)
     app.secret_key = app.config['SESSION_SECRET_KEY']
     login.init_app(app)
