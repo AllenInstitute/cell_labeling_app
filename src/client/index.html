@@ -21,36 +21,45 @@
             const PORT = "{{ port }}";
         </script>
         <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+
+        <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
     </head>
     <body>
-        <div class="container mt-5 app_container">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light" id="label_bar">
-                <div>
-                    <form>
-                        <div class="form-check form-check-inline" style="margin-left: 20px">
-                            <input type="radio" class="form-check-input" name="labelRadio"
-                                id="label_cell" required>
-                            <label class="form-check-label"
-                                for="label_cell">Cell</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input type="radio" class="form-check-input" name="labelRadio"
-                                id="label_not_cell" required>
-                            <label class="form-check-label" for="label_not_cell">Not
-                                Cell</label>
-                        </div>
-                        <button type="submit" class="btn btn-success"
-                        id="submit_label">
-                            Submit
-                        </button>
-                    </form>
-                    <div style='margin-left: 20px; margin-top: 20px'>
-                        <label for="notes" class="form-label">Notes</label>
-                        <input type='text' class='form-control' id='notes'>
-                    </div>
-                    <h6 id="loading_text" style="display: inline; margin-left: 20px"></h6>
+        <div class="sidenav mt-4">
+            <div class="sidenav-section" id="roi">
+                <h3>ROI</h3>
+                <div class="sidenav-content">
+                    <p>No ROI currently selected</p>
+                    <button type="button" class="btn btn-light" disabled>Load video & trace</button>
                 </div>
-            </nav>
+            </div>
+            <!-- <div>
+                <form>
+                    <div class="form-check form-check-inline" style="margin-left: 20px">
+                        <input type="radio" class="form-check-input" name="labelRadio"
+                            id="label_cell" required>
+                        <label class="form-check-label"
+                            for="label_cell">Cell</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input type="radio" class="form-check-input" name="labelRadio"
+                            id="label_not_cell" required>
+                        <label class="form-check-label" for="label_not_cell">Not
+                            Cell</label>
+                    </div>
+                    <button type="submit" class="btn btn-success"
+                    id="submit_label">
+                        Submit
+                    </button>
+                </form>
+                <div style='margin-left: 20px; margin-top: 20px'>
+                    <label for="notes" class="form-label">Notes</label>
+                    <input type='text' class='form-control' id='notes'>
+                </div>
+                <h6 id="loading_text" style="display: inline; margin-left: 20px"></h6>
+            </div> -->
+          </div>
+        <div class="container app_container">
             <div class="row">
                 <div class="col">
                     <div id="projection_container">
