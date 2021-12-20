@@ -49,12 +49,14 @@ def _is_roi_within_region(roi: Dict, region: JobRegion,
     return is_within
 
 
-def _get_soft_filter_roi_color(roi_id: int, experiment_id: str,
-                               color_map='viridis') -> Tuple[int, int, int]:
-    """Gets color based on classifier score for a given ROI in order to draw
-    attention to ROIs the classifier thinks are cells. Uses color map
-    defined by color_map"""
-    cmap = matplotlib.cm.get_cmap(color_map)
+def _get_classifier_score_for_roi(roi_id: int, experiment_id: str):
+    """
+    Gets classifier probability of cell for ROI
+    :param roi_id:
+    :param experiment_id:
+    :return:
+        Classifier probability of cell for ROI
+    """
     predictions = pd.read_csv(Path(current_app.config['PREDICTIONS_DIR']) /
                               f'{experiment_id}_inference.csv',
                               dtype={'experiment_id': str})
@@ -62,6 +64,16 @@ def _get_soft_filter_roi_color(roi_id: int, experiment_id: str,
     predictions = predictions.set_index('roi-id')
 
     classifier_score = predictions.loc[roi_id]['y_score']
+    return classifier_score
+
+
+def _get_soft_filter_roi_color(classifier_score: float,
+                               color_map='viridis') -> Tuple[int, int,
+                                                                 int]:
+    """Gets color based on classifier score for a given ROI in order to draw
+    attention to ROIs the classifier thinks are cells. Uses color map
+    defined by color_map"""
+    cmap = matplotlib.cm.get_cmap(color_map)
 
     color = tuple([int(255 * x) for x in cmap(classifier_score)][:-1])
     color = (color[0], color[1], color[2])
@@ -86,6 +98,7 @@ def get_rois_in_region(region: JobRegion,
             - width: roi bounding box width
             - height: roi bounding box height
             - id: roi id
+            - classifier_score: classifier score
     """
     artifact_path = get_artifacts_path(experiment_id=region.experiment_id)
     with h5py.File(artifact_path, 'r') as f:
@@ -104,6 +117,8 @@ def get_rois_in_region(region: JobRegion,
         width = roi['width']
         height = roi['height']
         id = roi['id']
+        classifier_score = _get_classifier_score_for_roi(
+            roi_id=id, experiment_id=region.experiment_id)
 
         res.append({
             'mask': mask,
@@ -111,7 +126,8 @@ def get_rois_in_region(region: JobRegion,
             'y': y,
             'width': width,
             'height': height,
-            'id': id
+            'id': id,
+            'classifier_score': classifier_score
         })
     return res
 
@@ -142,6 +158,11 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
             - color: color of contour
             - id: roi id
             - experiment_id: experiment id
+            - classifier_score: classifier probability of cell,
+            - box_x: upper-left bounding box x coordinate of contour,
+            - box_y: upper-left bounding box y coordinate of contour,
+            - box_width: bounding box width of contour,
+            - box_height: bounding box height of contour,
     """
     all_contours = []
 
@@ -155,6 +176,7 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
         height = roi['height']
         mask = roi['mask']
         id = roi['id']
+        classifier_score = roi['classifier_score']
 
         blank = np.zeros((512, 512), dtype='uint8')
         blank[y:y + height, x:x + width] = mask
@@ -165,13 +187,14 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
                 x.reshape(x.shape[0], 2).tolist() for x in contours
             ]
 
-        color = _get_soft_filter_roi_color(roi_id=id,
-                                           experiment_id=experiment_id)
+        color = _get_soft_filter_roi_color(
+            classifier_score=roi['classifier_score'])
         for contour in contours:
             all_contours.append({
                 'contour': contour,
                 'color': color,
                 'id': id,
+                'classifier_score': classifier_score,
                 'box_x': x,
                 'box_y': y,
                 'box_width': width,

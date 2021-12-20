@@ -495,13 +495,14 @@ class CellLabelingApp {
             });
         let labelText = 'Not Cell';
         
-        const getClassifierProbabilityTextColor = labelText => {
-            if (labelText === 'Cell') {
-                return 'rgb(255, 0, 0)';
-            } else {
-                const labelColor = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['color'];
-                return `rgb(${labelColor.join(', ')})`
-            }
+        const getClassifierProbabilityTextColor = () => {
+            const labelColor = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['color'];
+            return `rgb(${labelColor.join(', ')})`
+        }
+
+        const getClassifierScore = () => {
+            const score = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['classifier_score'];
+            return score.toPrecision(2);
         }
 
         if (this.selected_roi === res['roi_id'] & !this.cells.has(res['roi_id'])) {
@@ -516,10 +517,11 @@ class CellLabelingApp {
             this.selected_roi = res['roi_id'];
             $('#roi-sidenav > *').attr('disabled', false);
             $('#roi-sidenav #notes').attr('disabled', false);
+            $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
+            $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         }
 
         $('#roi-sidenav #roi-label').text(labelText);
-        // $('#roi-sidenav #roi-label').css('color', getLabelTextColor(labelText));
         
         // Redraw the contours
         this.toggleContoursOnProjection();
