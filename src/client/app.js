@@ -163,9 +163,7 @@ class CellLabelingApp {
         
         const shapes = _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
-            const line_width = (roi_contours[i]['id'] === this.selected_roi) | 
-                               (this.cells.has(roi_contours[i]['id'])) 
-                               ? 4 : 2;
+            const line_width = roi_contours[i]['id'] === this.selected_roi ? 4 : 2;
             return {
                 type: 'polyline',
                 path: path,
@@ -495,17 +493,32 @@ class CellLabelingApp {
             .catch(() => {
                 // ROI not clicked. do nothing
             });
+        let labelText = 'Not Cell';
         
-        if (this.selected_roi === res['roi_id']) {
+        const getClassifierProbabilityTextColor = labelText => {
+            if (labelText === 'Cell') {
+                return 'rgb(255, 0, 0)';
+            } else {
+                const labelColor = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['color'];
+                return `rgb(${labelColor.join(', ')})`
+            }
+        }
+
+        if (this.selected_roi !== res['roi_id'] | !this.cells.has(res['roi_id'])) {
             // Transition to "cell"
+            labelText = 'Cell';
             this.cells.add(res['roi_id']);
-            this.selected_roi = null;
+            this.selected_roi = res['roi_id'];
+            $('#roi-sidenav p#this-roi').text(`ROI ${this.selected_roi}`);
+            $('#roi-sidenav > *').attr('disabled', false);
+            $('#roi-sidenav #notes').attr('disabled', false);
         } else if (this.cells.has(res['roi_id'])) {
             // Transition to "not cell"
             this.cells.delete(res['roi_id']);
-        } else {
-            this.selected_roi = res['roi_id'];
         }
+
+        $('#roi-sidenav #roi-label').text(labelText);
+        // $('#roi-sidenav #roi-label').css('color', getLabelTextColor(labelText));
         
         // Redraw the contours
         this.toggleContoursOnProjection();

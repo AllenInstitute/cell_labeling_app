@@ -28,6 +28,10 @@
     font-size: 20px;
 }
 
+.sidenav .sidenav-content > * {
+    margin: 10px 10px;
+}
+
 .sidenav .sidenav-content .btn {
     font-size: 20px;
 }

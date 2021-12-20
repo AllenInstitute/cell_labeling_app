@@ -28,9 +28,14 @@
         <div class="sidenav mt-4">
             <div class="sidenav-section" id="roi">
                 <h3>ROI</h3>
-                <div class="sidenav-content">
-                    <p>No ROI currently selected</p>
+                <div class="sidenav-content" id="roi-sidenav">
+                    <p id='this-roi'>No ROI selected</p>
+                    <p>My label: <span id='roi-label' style="font-weight: bold;"></span></p>
                     <button type="button" class="btn btn-light" disabled>Load video & trace</button>
+                    <div>
+                        <label for="notes" class="form-label">Notes</label>
+                        <input type='text' class='form-control' id='notes' disabled>
+                    </div>
                 </div>
             </div>
             <!-- <div>
@@ -52,10 +57,6 @@
                         Submit
                     </button>
                 </form>
-                <div style='margin-left: 20px; margin-top: 20px'>
-                    <label for="notes" class="form-label">Notes</label>
-                    <input type='text' class='form-control' id='notes'>
-                </div>
                 <h6 id="loading_text" style="display: inline; margin-left: 20px"></h6>
             </div> -->
           </div>
