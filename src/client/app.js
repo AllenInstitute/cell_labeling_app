@@ -260,7 +260,14 @@ class CellLabelingApp {
         });
     }
     
-    async displayVideo() {
+    async displayVideo({videoTimeframe = null} = {}) {
+        /* Renders video
+        
+        Args
+        -----
+        - videoTimeframe:
+            Start, stop of video
+        */
         $('#video-spinner').show();
 
         // Disable contour toggle checkboxes until movie has loaded
@@ -275,9 +282,11 @@ class CellLabelingApp {
 
         this.is_video_shown = false;
 
-        let videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
+        if (videoTimeframe === null) {
+            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
             .then(async data => await data.json())
             .then(data => data['timeframe']);
+        }
 
         videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
 
@@ -329,7 +338,7 @@ class CellLabelingApp {
             displayTemporaryAlert({msg, type: 'danger'});
             return;
         }
-        this.displayVideo();
+        this.displayVideo({videoTimeframe: timesteps});
     }
 
     displayArtifacts({includeProjection = true, includeVideo = false, includeTrace = false} = {}) {
