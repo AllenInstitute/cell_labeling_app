@@ -14,7 +14,7 @@ from ophys_etl.modules.segmentation.qc_utils.video_utils import \
 from sqlalchemy import desc
 
 from src.server.database.database import db
-from src.server.database.schemas import LabelingJob, JobRegion, UserCells
+from src.server.database.schemas import LabelingJob, JobRegion, UserLabels
 from src.server.util import util
 from src.server.util.util import get_artifacts_path
 
@@ -59,10 +59,10 @@ def get_random_region():
     # Get all region ids user has labeled
     user_has_labeled = \
         (db.session
-         .query(UserCells.region_id)
-         .join(JobRegion, JobRegion.id == UserCells.region_id)
+         .query(UserLabels.region_id)
+         .join(JobRegion, JobRegion.id == UserLabels.region_id)
          .filter(JobRegion.job_id == job_id,
-                 UserCells.user_id == current_user.get_id())
+                 UserLabels.user_id == current_user.get_id())
          .all())
 
     # Get initial next region candidates query
@@ -240,13 +240,13 @@ def get_fov_bounds():
     }
 
 
-@api.route('/submit_cells_for_region', methods=['POST'])
-def submit_cells_for_region():
+@api.route('/submit_labels_for_region', methods=['POST'])
+def submit_labels_for_region():
     data = request.get_json(force=True)
     user_id = current_user.get_id()
-    user_cells = UserCells(user_id=user_id, region_id=data['region_id'],
-                           cells=json.dumps(data['cells']))
-    db.session.add(user_cells)
+    user_labels = UserLabels(user_id=user_id, region_id=data['region_id'],
+                             labels=json.dumps(data['labels']))
+    db.session.add(user_labels)
     db.session.commit()
 
     return 'success'

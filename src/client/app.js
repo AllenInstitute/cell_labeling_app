@@ -404,11 +404,27 @@ class CellLabelingApp {
     }
 
     submitLabelsForRegion() {
-        const url = `http://localhost:${PORT}/submit_cells_for_region`;
+        const url = `http://localhost:${PORT}/submit_labels_for_region`;
         $('button#submit_labels').attr('disabled', true);
         const data = {
             region_id: this.region['id'],
-            cells: {roi_ids: Array.from(this.cells)},
+            labels: [
+                ...Array.from(this.cells).map(x => {
+                    return {
+                        roi_id: x, 
+                        label: 'cell'
+                    }
+                }),
+                ...this.roi_contours
+                .map(x => x['id'])
+                .filter(x => !this.cells.has(x['id']))
+                .map(x => {
+                    return {
+                        roi_id: x, 
+                        label: 'not cell'
+                    }
+                })
+            ]
         };
         return $.post(url, JSON.stringify(data))
         .then(() => {

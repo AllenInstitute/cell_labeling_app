@@ -36,14 +36,14 @@ class User(UserMixin, db.Model):
     id = db.Column(db.String, primary_key=True)
 
 
-class UserCells(db.Model):
-    """All ROIs within a region a user has labeled as cell"""
+class UserLabels(db.Model):
+    """Labels for all ROIs within a region"""
     user_id = db.Column(db.String, db.ForeignKey(User.id), primary_key=True)
     region_id = db.Column(db.Integer, db.ForeignKey(JobRegion.id),
                           primary_key=True)
 
     # json representation
-    cells = db.Column(db.String, primary_key=True)
+    labels = db.Column(db.String, primary_key=True)
 
 
 class UserRoi(db.Model):
