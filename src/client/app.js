@@ -545,6 +545,7 @@ class CellLabelingApp {
         } else if (this.cells.has(res['roi_id'])) {
             // Transition to "not cell"
             this.cells.delete(res['roi_id']);
+            this.selected_roi = res['roi_id'];
         } else {
             // Select ROI
             this.selected_roi = res['roi_id'];
