@@ -525,8 +525,6 @@ class CellLabelingApp {
             // No ROI clicked. Do nothing
             return;
         }
-
-        let labelText = 'Not Cell';
         
         const getClassifierProbabilityTextColor = () => {
             const labelColor = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['color'];
@@ -538,25 +536,28 @@ class CellLabelingApp {
             return score.toFixed(2);
         }
 
-        if (this.selected_roi === res['roi_id'] & !this.cells.has(res['roi_id'])) {
-            // Transition to "cell"
-            labelText = 'Cell';
-            this.cells.add(res['roi_id']);
-        } else if (this.cells.has(res['roi_id'])) {
-            // Transition to "not cell"
-            this.cells.delete(res['roi_id']);
-            this.selected_roi = res['roi_id'];
+        if (this.selected_roi === res['roi_id']) {
+            if (this.cells.has(res['roi_id'])) {
+                // Transition to "not cell"
+                this.cells.delete(res['roi_id']);
+                this.selected_roi = res['roi_id'];
+            } else {
+                // Transition to "cell"
+                this.cells.add(res['roi_id']);
+            }
+
         } else {
             // Select ROI
             this.selected_roi = res['roi_id'];
             $('#roi-sidenav #this-roi').text(`ROI ${this.selected_roi}`);
             $('#roi-sidenav > *').attr('disabled', false);
             $('#roi-sidenav #notes').attr('disabled', false);
-            $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
-            $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         }
 
+        const labelText = this.cells.has(res['roi_id']) ? 'Cell' : 'Not Cell';
         $('#roi-sidenav #roi-label').text(labelText);
+        $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
+        $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         
         // Redraw the contours
         this.toggleContoursOnProjection();
