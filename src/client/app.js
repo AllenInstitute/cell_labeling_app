@@ -336,7 +336,7 @@ class CellLabelingApp {
                 </div>`;
             alert = $(alert);
 
-            alert.insertBefore($('#label_bar'));
+            $('#app-container').prepend(alert);
             
             setTimeout(() => $('#alert-error').alert('close'), 10000);
             return;
@@ -407,7 +407,7 @@ class CellLabelingApp {
                 </div>`;
             alert = $(alert);
 
-            alert.insertBefore($('#label_bar'));
+            $('#app-container').prepend(alert);
             
             setTimeout(() => $('#alert-error').alert('close'), 10000);
         });
@@ -433,14 +433,14 @@ class CellLabelingApp {
         $.get('/users/getCurrentUser').then(data => {
             const username = data['user_id'];
             let alert = `
-                <div class="alert alert-info fade show" role="alert" style="margin-top: 20px" id="alert-error">
+                <div class="alert alert-info fade show" role="alert" style="margin-top: 20px" id="alert-login">
                     Logged in as ${username}
                 </div>`;
             alert = $(alert);
 
-            alert.insertBefore($('#label_bar'));
+            $('#app-container').prepend(alert);
             
-            setTimeout(() => $('#alert-error').alert('close'), 5000);
+            setTimeout(() => $('#alert-login').alert('close'), 5000);
         });
     }
 
