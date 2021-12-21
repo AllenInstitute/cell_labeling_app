@@ -428,7 +428,7 @@ class CellLabelingApp {
         };
         return $.post(url, JSON.stringify(data))
         .then(() => {
-            displayTemporaryAlert({msg: 'Successfullly submitted labels for region', type: 'success'});
+            displayTemporaryAlert({msg: 'Successfullly submitted labels for region<br>Loading next region', type: 'success'});
         })
         .catch(() => {
             displayTemporaryAlert({msg: 'Error submitting labels for region', type: 'danger'});
