@@ -17,6 +17,8 @@
         <script src="https://cdn.plot.ly/plotly-2.4.2.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/9.5.1/math.min.js" integrity="sha512-7+fUzDKxopLeVKiXTdoQQZBl6Zh9Bbl/NrZoowiddStpj7GXTUCM+LOPay4Wzxz14HazsoSsO96UFvvZqAH5rw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script id="MathJax-script" async
+            src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <script>
             const PORT = "{{ port }}";
         </script>
@@ -31,7 +33,7 @@
                 <div class="sidenav-content" id="roi-sidenav">
                     <p id='this-roi'>No ROI selected</p>
                     <p>My label: <span id='roi-label' style="font-weight: bold;"></span></p>
-                    <p>P(Cell) =  <span id='roi-classifier-score' style="font-weight: bold"></span></p>
+                    <p>\(P(Cell) = \) <span id='roi-classifier-score' style="font-weight: bold"></span></p>
                     <button id="roi-display-video-and-trace" type="button" class="btn btn-light" disabled>Load video & trace</button>
                     <div>
                         <label for="notes" class="form-label">Notes</label>
