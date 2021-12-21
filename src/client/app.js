@@ -275,17 +275,11 @@ class CellLabelingApp {
 
         this.is_video_shown = false;
 
-        let videoTimeframe = this.videoTimeframe;
-
-        if (videoTimeframe === null) {
-            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
+        let videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
             .then(async data => await data.json())
-            .then(data => {
-                videoTimeframe = data['timeframe'];
-            });
-        }
+            .then(data => data['timeframe']);
 
-        this.videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
+        videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
 
         const url = `http://localhost:${PORT}/get_video`;
         const postData = {
@@ -295,7 +289,7 @@ class CellLabelingApp {
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
-            timeframe: this.videoTimeframe
+            timeframe: videoTimeframe
         };
         return $.ajax({
             xhrFields: {
@@ -319,7 +313,7 @@ class CellLabelingApp {
                 $('button#trim_video_to_timeframe').attr('disabled', false);
             }
 
-            $('#timestep_display').text(`Timesteps: ${this.videoTimeframe[0]} - ${this.videoTimeframe[1]}`);
+            $('#timestep_display').text(`Timesteps: ${videoTimeframe[0]} - ${videoTimeframe[1]}`);
 
             this.is_video_shown = true;
             $('#video-spinner').hide();
@@ -335,7 +329,6 @@ class CellLabelingApp {
             displayTemporaryAlert({msg, type: 'danger'});
             return;
         }
-        this.videoTimeframe = timesteps;
         this.displayVideo();
     }
 
@@ -364,7 +357,6 @@ class CellLabelingApp {
         this.is_video_shown = false;
         this.roi_contours = null;
         this.fovBounds = null;
-        this.videoTimeframe = null;
         this.experiment_id = null;
         this.projection_is_shown = false;
         this.projection_raw = null;
