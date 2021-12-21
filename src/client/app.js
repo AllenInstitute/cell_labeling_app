@@ -37,8 +37,8 @@ class CellLabelingApp {
             this.videoGoToTimesteps();
         });
 
-        $('button#submit_label').on('click', () => {
-            this.submitLabel().then(() => {
+        $('button#submit_labels').on('click', () => {
+            this.submitLabelsForRegion().then(() => {
                 this.loadNewRegion();
             }).catch(e => {
                 // do nothing
@@ -379,7 +379,7 @@ class CellLabelingApp {
         this.cells = new Set();
         this.selected_roi = null;
 
-        $('button#submit_label').attr('disabled', true);
+        $('button#submit_labels').attr('disabled', true);
 
         // Disable all the video settings (video not loaded yet)
         $('#video_include_mask_outline').attr("disabled", true);
@@ -396,7 +396,6 @@ class CellLabelingApp {
         const region = await this.getRandomRegionFromRandomExperiment()
         .then(region => {
             this.is_loading_new_region = false;
-            $('button#submit_label').attr('disabled', false);
             return region;
         })
         .catch(() => {
@@ -413,31 +412,20 @@ class CellLabelingApp {
             setTimeout(() => $('#alert-error').alert('close'), 10000);
         });
         if (region['region'] !== null) {
-            this.displayArtifacts();
+            return this.displayArtifacts().then(() => {
+                $('button#submit_labels').attr('disabled', false);
+            })
         }
     }
 
-    submitLabel() {
-        const url = `http://localhost:${PORT}/add_label`;
-        if (!($('#label_cell').is(':checked') || $('#label_not_cell').is(':checked'))) {
-            return Promise.reject('label is not checked');
-        }
-        $('button#submit_label').attr('disabled', true);
-        const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
-        let notes = $('#notes').val();
-        if (!notes) {
-            notes = null;
-        }
+    submitLabelsForRegion() {
+        const url = `http://localhost:${PORT}/submit_cells_for_region`;
+        $('button#submit_labels').attr('disabled', true);
         const data = {
-            experiment_id: this.experiment_id,
-            roi_id: this.region['id'],
-            label: label,
-            notes
+            region_id: this.region['id'],
+            cells: {roi_ids: Array.from(this.cells)},
         };
         return $.post(url, JSON.stringify(data)).then(() => {
-            $('#label_cell').prop('checked', false);
-            $('#label_not_cell').prop('checked', false);
-            $('#notes').val(null);
         })
     }
 
