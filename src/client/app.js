@@ -184,6 +184,7 @@ class CellLabelingApp {
 
     async displayProjection() {
         this.loadingIndicator.add('Loading projection...');
+        $('#projection-spinner').show();
 
         // Disable projection settings until loaded
         $('#projection_type').attr('disabled', true);
@@ -263,14 +264,17 @@ class CellLabelingApp {
 
             this.loadingIndicator.remove('Loading projection...');
 
-            this.toggleContoursOnProjection();
+            await this.toggleContoursOnProjection();
 
             this.updateProjectionContrast();
+
+            $('#projection-spinner').hide();
         });
     }
     
     async displayVideo() {
         this.loadingIndicator.add('Loading video...');
+        $('#video-spinner').show();
 
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
@@ -332,6 +336,7 @@ class CellLabelingApp {
 
             this.is_video_shown = true;
             this.loadingIndicator.remove('Loading video...');
+            $('#video-spinner').hide();
         })
     }
 

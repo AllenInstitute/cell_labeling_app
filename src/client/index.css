@@ -35,4 +35,12 @@
 .sidenav .sidenav-content .btn {
     font-size: 20px;
 }
+
+.spinner-border {
+    z-index: 999;
+    position: fixed;
+    width: 80px;
+    height: 80px;
+    display: none;
+}
   
