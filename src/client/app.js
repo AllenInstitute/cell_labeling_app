@@ -372,6 +372,7 @@ class CellLabelingApp {
         this.is_loading_new_region = false;
         this.cells = new Set();
         this.selected_roi = null;
+        this.resetSideNav();
 
         $('button#submit_labels').attr('disabled', true);
 
@@ -536,6 +537,15 @@ class CellLabelingApp {
         
         // Redraw the contours
         this.toggleContoursOnProjection();
+
+    }
+
+    resetSideNav() {
+        $('#roi-sidenav #this-roi').text('No ROI selected');
+        $('#roi-sidenav > *').attr('disabled', true);
+        $('#roi-sidenav #notes').attr('disabled', true);
+        $('#roi-classifier-score').text('');
+        $('#roi-label').text('');
 
     }
 }
