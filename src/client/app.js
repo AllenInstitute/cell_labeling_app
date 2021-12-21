@@ -5,10 +5,6 @@ import {
     toRGB
 } from './util.js';
 
-import {
-    LoadingIndicator
-} from './loadingIndicator.js';
-
 
 class CellLabelingApp {
     /* Main App class */
@@ -89,7 +85,6 @@ class CellLabelingApp {
 
     displayTrace() {
         const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`;
-        this.loadingIndicator.add('Loading trace...');
 
         return $.get(url, data => {
             const trace = {
@@ -114,8 +109,6 @@ class CellLabelingApp {
             if (this.is_video_shown) {
                 $('button#trim_video_to_timeframe').attr('disabled', false);
             }
-
-            this.loadingIndicator.remove('Loading trace...');
         });
     }
 
@@ -123,7 +116,6 @@ class CellLabelingApp {
         let roi_contours = this.roi_contours;
 
         if (roi_contours === null) {
-            this.loadingIndicator.add('Loading ROI contours within region...');
             $("#projection_include_mask_outline").attr("disabled", true);
             const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
             await $.get(url, data => {
@@ -133,8 +125,6 @@ class CellLabelingApp {
 
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
-
-                this.loadingIndicator.remove('Loading ROI contours within region...');
             });
         }
 
@@ -183,7 +173,6 @@ class CellLabelingApp {
     }
 
     async displayProjection() {
-        this.loadingIndicator.add('Loading projection...');
         $('#projection-spinner').show();
 
         // Disable projection settings until loaded
@@ -262,8 +251,6 @@ class CellLabelingApp {
             $('input#projection_contrast_low_quantile').attr('disabled', false);
             $('input#projection_contrast_high_quantile').attr('disabled', false);
 
-            this.loadingIndicator.remove('Loading projection...');
-
             await this.toggleContoursOnProjection();
 
             this.updateProjectionContrast();
@@ -273,7 +260,6 @@ class CellLabelingApp {
     }
     
     async displayVideo() {
-        this.loadingIndicator.add('Loading video...');
         $('#video-spinner').show();
 
         // Disable contour toggle checkboxes until movie has loaded
@@ -335,7 +321,6 @@ class CellLabelingApp {
             $('#timestep_display').text(`Timesteps: ${this.videoTimeframe[0]} - ${this.videoTimeframe[1]}`);
 
             this.is_video_shown = true;
-            this.loadingIndicator.remove('Loading video...');
             $('#video-spinner').hide();
         })
     }
@@ -393,7 +378,6 @@ class CellLabelingApp {
         this.is_loading_new_region = false;
         this.cells = new Set();
         this.selected_roi = null;
-        this.loadingIndicator = new LoadingIndicator();
 
         $('button#submit_label').attr('disabled', true);
 
@@ -450,12 +434,10 @@ class CellLabelingApp {
             label: label,
             notes
         };
-        this.loadingIndicator.add('Submitting...');
         return $.post(url, JSON.stringify(data)).then(() => {
             $('#label_cell').prop('checked', false);
             $('#label_not_cell').prop('checked', false);
             $('#notes').val(null);
-            this.loadingIndicator.remove('Submitting...');
         })
     }
 
