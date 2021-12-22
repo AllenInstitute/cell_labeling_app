@@ -389,6 +389,8 @@ class CellLabelingApp {
         $('#video_include_mask_outline').attr("disabled", true);
         $('#video_include_surrounding_rois').attr("disabled", true);
         $('#trim_video_to_timeframe').attr("disabled", true);
+
+        $('#timestep_display').text('');
     }
 
     async loadNewRegion() {
