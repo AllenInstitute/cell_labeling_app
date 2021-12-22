@@ -116,6 +116,12 @@ class CellLabelingApp {
     async toggleContoursOnProjection() {
         let roi_contours = this.roi_contours;
 
+        if (this.discrepancy_roi_contours !== null) {
+            // If we are in the state of reviewing ROIs with labels
+            // that disagree with the classifier
+            roi_contours = this.discrepancy_roi_contours;
+        }
+
         if (roi_contours === null) {
             $("#projection_include_mask_outline").attr("disabled", true);
             const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
@@ -365,6 +371,7 @@ class CellLabelingApp {
         this.is_trace_shown = false;
         this.is_video_shown = false;
         this.roi_contours = null;
+        this.discrepancy_roi_contours = null;
         this.fovBounds = null;
         this.experiment_id = null;
         this.projection_is_shown = false;
@@ -572,15 +579,97 @@ class CellLabelingApp {
         this.notes.set(this.selected_roi, notes);
     }
 
-    handleSubmitRegion() {
-        /* Handles submit labels button click */
+    handleSubmitRegion({userHasReviewed = false} = {}) {
+        /* Handles submit labels button click 
+        
+        Args
+        ------
+        - userHasReviewed:
+            Whether the user has reviewed any label-classifier 
+            discrepancies and chose to ignore them
+        */
         $('button#submit_labels').attr('disabled', true);
+
+        if (!userHasReviewed) {
+            const isValid = this.validateLabels();
+            if (!isValid) {
+                $('button#submit_labels').attr('disabled', false);
+                return;
+            }
+        }
 
         this.submitRegion().then(() => {
             this.loadNewRegion();
         }).catch(e => {
             $('button#submit_labels').attr('disabled', false);
         });
+    }
+
+    validateLabels() {
+        /* Flags any rois which might have been incorrectly labeled.
+        Any rois with a label that disagrees with the classifier score are flagged */
+        const maybeCell = this.roi_contours
+            .filter(x => x['classifier_score'] >= 0.5 & !this.cells.has(x['id']));
+        const maybeNotCell = this.roi_contours
+            .filter(x => x['classifier_score'] < 0.5 & this.cells.has(x['id']));
+
+        if (maybeCell.length > 0 | maybeNotCell.length > 0) {
+            const msgs = [];
+            if (maybeCell.length > 0) {
+                msgs.push(`There are ${maybeCell.length} ROIs that were labeled as "Not Cell" that the classifier thinks are cell.`);
+            }
+
+            if (maybeNotCell.length > 0) {
+                msgs.push(`There are ${maybeNotCell.length} ROIs that were labeled as "Cell" that the classifier thinks are not cell.`);
+            }
+
+            const msg = msgs.join('<br><br>');
+
+            const modalHtml = `
+                <div class="modal" tabindex="-1" id="review-modal">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Review</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="review-modal-close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>${msg}</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="submit-anyway">Submit anyway</button>
+                                <button type="button" class="btn btn-primary" id="review">Review these ROIs</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#modal-review-container').html(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('review-modal'));
+            modal.show();
+
+            $('#review-modal-close').click(() => {
+                modal.hide();
+            });
+
+            $('#review-modal #submit-anyway').click(() => {
+                this.handleSubmitRegion({userHasReviewed: true});
+                modal.hide();
+            });
+
+            $('#review-modal #review').click(() => {
+                this.discrepancy_roi_contours = [...maybeCell, ...maybeNotCell];
+                this.toggleContoursOnProjection().then(() => {
+                    modal.hide();
+                });
+            });
+
+            return false;
+        }
+
+        return true;
+        
     }
 }
 
