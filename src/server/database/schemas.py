@@ -46,7 +46,7 @@ class UserLabels(db.Model):
     labels = db.Column(db.String, primary_key=True)
 
 
-class UserRoi(db.Model):
+class UserRoiExtra(db.Model):
     """Additional metadata a user has given for an ROI"""
     user_id = db.Column(db.String, db.ForeignKey(User.id), primary_key=True)
     region_id = db.Column(db.Integer, db.ForeignKey(JobRegion.id),

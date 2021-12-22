@@ -39,11 +39,7 @@ class CellLabelingApp {
         });
 
         $('button#submit_labels').on('click', () => {
-            this.submitLabelsForRegion().then(() => {
-                this.loadNewRegion();
-            }).catch(e => {
-                // do nothing
-            });
+            this.handleSubmitRegion();
         });
 
         $('input#projection_contrast_low_quantile, input#projection_contrast_high_quantile').on('input', () => {
@@ -58,6 +54,10 @@ class CellLabelingApp {
 
         $('#roi-display-video-and-trace').click(() => {
             this.displayArtifacts({includeProjection: false, includeVideo: true, includeTrace: true});
+        });
+
+        $('#notes').on('input', () => {
+            this.handleNotes();
         });
     }
 
@@ -373,6 +373,7 @@ class CellLabelingApp {
         this.is_loading_new_region = false;
         this.cells = new Set();
         this.selected_roi = null;
+        this.notes = new Map();
         this.resetSideNav();
 
         $('button#submit_labels').attr('disabled', true);
@@ -405,9 +406,17 @@ class CellLabelingApp {
         }
     }
 
-    submitLabelsForRegion() {
-        const url = `http://localhost:${PORT}/submit_labels_for_region`;
-        $('button#submit_labels').attr('disabled', true);
+    submitRegion() {
+        const url = `http://localhost:${PORT}/submit_region`;
+
+        const roi_extra = Array.from(this.notes).map(x => {
+            const [roi_id, notes] = x;
+            return {
+                roi_id,
+                notes
+            };
+        });
+
         const data = {
             region_id: this.region['id'],
             labels: [
@@ -426,7 +435,8 @@ class CellLabelingApp {
                         label: 'not cell'
                     }
                 })
-            ]
+            ],
+            roi_extra
         };
         return $.post(url, JSON.stringify(data))
         .then(() => {
@@ -434,9 +444,8 @@ class CellLabelingApp {
         })
         .catch(() => {
             displayTemporaryAlert({msg: 'Error submitting labels for region', type: 'danger'});
-            $('button#submit_labels').attr('disabled', false);
             throw Error();
-        })
+        });
     }
 
     displayLoginMessage() {
@@ -529,6 +538,12 @@ class CellLabelingApp {
             $('#roi-sidenav #this-roi').text(`ROI ${this.selected_roi}`);
             $('#roi-sidenav > *').attr('disabled', false);
             $('#roi-sidenav #notes').attr('disabled', false);
+
+            if (this.notes.has(this.selected_roi)) {
+                $('#notes').val(this.notes.get(this.selected_roi));
+            } else {
+                $('#notes').val('');
+            }
         }
 
         const labelText = this.cells.has(res['roi_id']) ? 'Cell' : 'Not Cell';
@@ -547,7 +562,25 @@ class CellLabelingApp {
         $('#roi-sidenav #notes').attr('disabled', true);
         $('#roi-classifier-score').text('');
         $('#roi-label').text('');
+        $('#notes').val('');
 
+    }
+
+    handleNotes() {
+        /* Handles a notes textbox change */
+        const notes = $('#notes').val();
+        this.notes.set(this.selected_roi, notes);
+    }
+
+    handleSubmitRegion() {
+        /* Handles submit labels button click */
+        $('button#submit_labels').attr('disabled', true);
+
+        this.submitRegion().then(() => {
+            this.loadNewRegion();
+        }).catch(e => {
+            $('button#submit_labels').attr('disabled', false);
+        });
     }
 }
 

@@ -14,7 +14,8 @@ from ophys_etl.modules.segmentation.qc_utils.video_utils import \
 from sqlalchemy import desc
 
 from src.server.database.database import db
-from src.server.database.schemas import LabelingJob, JobRegion, UserLabels
+from src.server.database.schemas import LabelingJob, JobRegion, UserLabels, \
+    UserRoiExtra
 from src.server.util import util
 from src.server.util.util import get_artifacts_path
 
@@ -240,13 +241,23 @@ def get_fov_bounds():
     }
 
 
-@api.route('/submit_labels_for_region', methods=['POST'])
-def submit_labels_for_region():
+@api.route('/submit_region', methods=['POST'])
+def submit_region():
+    """Inserts records for labels and additional user-submitted roi metadata"""
     data = request.get_json(force=True)
     user_id = current_user.get_id()
+
+    # add labels
     user_labels = UserLabels(user_id=user_id, region_id=data['region_id'],
                              labels=json.dumps(data['labels']))
     db.session.add(user_labels)
+
+    # add roi extra
+    for roi in data['roi_extra']:
+        roi_extra = UserRoiExtra(user_id=user_id, region_id=data['region_id'],
+                                 roi_id=roi['roi_id'], notes=roi['notes'])
+        db.session.add(roi_extra)
+
     db.session.commit()
 
     return 'success'
