@@ -45,6 +45,8 @@ class UserLabels(db.Model):
     # json representation
     labels = db.Column(db.String, primary_key=True)
 
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
 
 class UserRoiExtra(db.Model):
     """Additional metadata a user has given for an ROI"""
@@ -53,3 +55,4 @@ class UserRoiExtra(db.Model):
                           primary_key=True)
     roi_id = db.Column(db.Integer, primary_key=True)
     notes = db.Column(db.String)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
