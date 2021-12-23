@@ -449,7 +449,7 @@ class CellLabelingApp {
         };
         return $.post(url, JSON.stringify(data))
         .then(() => {
-            displayTemporaryAlert({msg: 'Successfullly submitted labels for region<br>Loading next region', type: 'success'});
+            displayTemporaryAlert({msg: 'Successfully submitted labels for region<br>Loading next region', type: 'success'});
         })
         .catch(() => {
             displayTemporaryAlert({msg: 'Error submitting labels for region', type: 'danger'});
@@ -617,12 +617,16 @@ class CellLabelingApp {
 
         if (maybeCell.length > 0 | maybeNotCell.length > 0) {
             const msgs = [];
+            const helpingVerb = count => count === 1 ? 'is' : 'are';
+            const roiStr = count => count === 1 ? 'ROI' : 'ROIs';
             if (maybeCell.length > 0) {
-                msgs.push(`There are ${maybeCell.length} ROIs that were labeled as "Not Cell" that the classifier thinks are cell.`);
+                msgs.push(`There ${helpingVerb(maybeCell.length)} <b>${maybeCell.length}</b> 
+                    ${roiStr(maybeCell.length)} labeled as "Not Cell" that the classifier thinks ${helpingVerb(maybeCell.length)} cell.`);
             }
 
             if (maybeNotCell.length > 0) {
-                msgs.push(`There are ${maybeNotCell.length} ROIs that were labeled as "Cell" that the classifier thinks are not cell.`);
+                msgs.push(`There ${helpingVerb(maybeNotCell.length)} <b>${maybeNotCell.length}</b> 
+                    ${roiStr(maybeNotCell.length)} labeled as "Cell" that the classifier thinks ${helpingVerb(maybeNotCell.length)} not cell.`);
             }
 
             const msg = msgs.join('<br><br>');
