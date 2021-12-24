@@ -221,14 +221,17 @@ class CellLabelingApp {
                 const layout = document.getElementById('projection').layout;
                 Plotly.react('projection', [trace1], layout);
             } else {
+                const dim = 512;
+                const margin = 30;
+
                 const layout = {
-                    width: 512,
-                    height: 512,
+                    width: dim + margin * 2,
+                    height: dim + margin * 2,
                     margin: {
-                        t: 30,
-                        l: 30,
-                        r: 30,
-                        b: 30
+                        t: margin,
+                        l: margin,
+                        r: margin,
+                        b: margin
                     },
                     xaxis: {
                         range: this.fovBounds['x']
@@ -317,7 +320,7 @@ class CellLabelingApp {
             const blob = new Blob([response], {type: "video\/mp4"});
             const blobUrl = URL.createObjectURL(blob);
             const video = `
-                <video controls id="movie" width="452" height="452" src=${blobUrl}></video>
+                <video controls id="movie" width="512" height="512" src=${blobUrl}></video>
             `;
             $('#video_container').html($(video));
 
