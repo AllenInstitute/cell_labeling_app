@@ -65,12 +65,9 @@ class CellLabelingApp {
         const projection = document.getElementById('projection');
 
         projection.on('plotly_click', data => {
-            console.log('start plotly_click');
             const point  = data.points[0];
             const [y, x] = point.pointIndex;
             this.handleProjectionClick(x, y);
-            console.log('end plotly_click');
-
         });
 
     }
