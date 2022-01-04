@@ -61,6 +61,20 @@ class CellLabelingApp {
         });
     }
 
+    addProjectionListeners() {
+        const projection = document.getElementById('projection');
+
+        projection.on('plotly_click', data => {
+            console.log('start plotly_click');
+            const point  = data.points[0];
+            const [y, x] = point.pointIndex;
+            this.handleProjectionClick(x, y);
+            console.log('end plotly_click');
+
+        });
+
+    }
+
     async getRandomRegionFromRandomExperiment() {
         const region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
             let region;
@@ -241,17 +255,15 @@ class CellLabelingApp {
                     }
                 };
 
-                Plotly.newPlot('projection', [trace1], layout).then(() => {
+                const config = {
+                    doubleClick: false
+                };
+
+                Plotly.newPlot('projection', [trace1], layout, config).then(() => {
                     this.projection_is_shown = true;
                 });
                 
-                const projection = document.getElementById('projection');
-
-                projection.on('plotly_click', data => {
-                    const point  = data.points[0];
-                    const [y, x] = point.pointIndex;
-                    this.handleProjectionClick(x, y);
-                });
+                this.addProjectionListeners();
             }
             
             $('#projection_type').attr('disabled', false);
