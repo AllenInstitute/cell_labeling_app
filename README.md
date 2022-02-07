@@ -16,7 +16,9 @@ You will need a config file (.py) to run the app. It currently requires the foll
 | SQLALCHEMY_DATABASE_URI | Path to app database (will get created if does not already exist) |
 | ARTIFACT_DIR            | Path to artifacts (videos, projections, etc) (as hdf5 files)      |
 
-Execute `src.server.main` to start the web server.
+If you have not already created and populated your `SQLALCHEMY_DATABASE`, execute `python src/server/database/populate_db.py` to populate your database of labeling jobs.
+
+Execute `python src/server/main.py` to start the web server.
 
 3. If this computer does not have access to a browser, then you need to tunnel to port `<PORT>` on a computer that does.
 On linux the command is 
