@@ -3,10 +3,10 @@ from pathlib import Path
 
 from flask import Flask
 
-from src.server.database.database import db
-from src.server.endpoints.endpoints import api
-from src.server.endpoints.user_authentication import users
-from src.server.user_authentication.user_authentication import login
+from server.database.database import db
+from server.endpoints.endpoints import api
+from server.endpoints.user_authentication import users
+from server.user_authentication.user_authentication import login
 
 
 def create_app(config_file: Path, port=5000):
