@@ -9,6 +9,12 @@ cd cell_labeling_app
 conda env create -f environment.yml
 conda activate cell_labeling_app
 ```
+
+Then install the labeling app with
+```
+python setup.py install
+```
+
 You will need a config file (.py) to run the app. It currently requires the following:
 
 | variable                | description                                                       |
