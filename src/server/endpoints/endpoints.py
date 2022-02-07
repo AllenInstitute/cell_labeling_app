@@ -10,8 +10,7 @@ from PIL import Image
 from flask import render_template, request, send_file, Blueprint, current_app, \
     Request
 from flask_login import current_user
-from ophys_etl.modules.segmentation.qc_utils.video_generator import \
-    VideoGenerator
+from ophys_etl.utils.thumbnail_video_generator import VideoGenerator
 from sqlalchemy import desc
 
 from src.server.database.database import db
