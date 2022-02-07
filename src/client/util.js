@@ -71,9 +71,32 @@ function toRGB(X) {
     return X;
 }
 
+function displayTemporaryAlert({msg, type, showTime = 5000} = {}) {
+    /* Displays an alert at top of page that hides after showTime ms
+    
+    Args
+    --------
+    - msg:
+        The message to display
+    - type:
+        The type of alert (success, danger, etc. Bootstrap classes)
+    - showTime:
+        The amount of time to display the alert in ms
+    */
+
+    let alert = `
+        <div class="alert alert-${type} fade show" role="alert" style="margin-top: 20px" id="alert">
+            ${msg}
+        </div>`;
+    alert = $(alert);
+    $('#app-container').prepend(alert);
+    setTimeout(() => $('#alert').alert('close'), showTime);
+}
+
 export {
     clipImageToQuantiles,
     bytesToMatrix,
     scaleToUint8,
-    toRGB
+    toRGB,
+    displayTemporaryAlert
 }

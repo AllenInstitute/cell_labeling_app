@@ -1,0 +1,46 @@
+/* The sidebar menu */
+.sidenav {
+    height: 100%; /* Full-height: remove this if you want "auto" height */
+    width: 400px; /* Set the width of the sidebar */
+    position: fixed; /* Fixed Sidebar (stay in place on scroll) */
+    z-index: 1; /* Stay on top */
+    top: 0; /* Stay at the top */
+    left: 0;
+    border: 2px solid rgb(223, 223, 223);
+    border-top: none;
+    overflow-x: hidden; /* Disable horizontal scroll */
+  }
+
+
+/* Style page content */
+.app_container {
+    margin-left: 400px; /* Same as the width of the sidebar */
+  }
+
+.sidenav .sidenav-section h3{
+    background-color: rgb(223, 223, 223);
+    padding: 0.5em 0.5em;
+}
+
+.sidenav .sidenav-content {
+    margin-left: 13px;
+    margin-top: 20px;
+    font-size: 20px;
+}
+
+.sidenav .sidenav-content > * {
+    margin: 10px 10px;
+}
+
+.sidenav .sidenav-content .btn {
+    font-size: 20px;
+}
+
+.spinner-border {
+    z-index: 999;
+    position: fixed;
+    width: 80px;
+    height: 80px;
+    display: none;
+}
+  

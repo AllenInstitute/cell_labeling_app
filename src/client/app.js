@@ -2,12 +2,9 @@ import {
     clipImageToQuantiles,
     bytesToMatrix,
     scaleToUint8,
-    toRGB
+    toRGB,
+    displayTemporaryAlert
 } from './util.js';
-
-import {
-    LoadingIndicator
-} from './loadingIndicator.js';
 
 
 class CellLabelingApp {
@@ -19,12 +16,7 @@ class CellLabelingApp {
 
     addListeners() {
         $('#projection_include_mask_outline').on('click', () => {
-            this.show_current_roi_outline_on_projection = !this.show_current_roi_outline_on_projection;
-            this.toggleContoursOnProjection();
-        });
-
-        $('#projection_include_surrounding_rois').on('click', () => {
-            this.show_all_roi_outlines_on_projection = !this.show_all_roi_outlines_on_projection;
+            this.show_current_region_roi_contours_on_projection = !this.show_current_region_roi_contours_on_projection;
             this.toggleContoursOnProjection();
         });
 
@@ -46,12 +38,8 @@ class CellLabelingApp {
             this.videoGoToTimesteps();
         });
 
-        $('button#submit_label').on('click', () => {
-            this.submitLabel().then(() => {
-                this.loadNewRoi();
-            }).catch(e => {
-                // do nothing
-            });
+        $('button#submit_labels').on('click', () => {
+            this.handleSubmitRegion();
         });
 
         $('input#projection_contrast_low_quantile, input#projection_contrast_high_quantile').on('input', () => {
@@ -62,35 +50,53 @@ class CellLabelingApp {
 
         $('button#projection_contrast_reset').on('click', () => {
             this.resetProjectionContrast();
-        })
+        });
+
+        $('#roi-display-video-and-trace').click(() => {
+            this.displayArtifacts({includeProjection: false, includeVideo: true, includeTrace: true});
+        });
+
+        $('#notes').on('input', () => {
+            this.handleNotes();
+        });
     }
 
-    async getRandomRoiFromRandomExperiment() {
-        const roi = await $.get(`http://localhost:${PORT}/get_random_roi`, data => {
-            let roi;
-            if (data['roi'] === null) {
-                // No more rois to label
+    addProjectionListeners() {
+        const projection = document.getElementById('projection');
+
+        projection.on('plotly_click', data => {
+            const point  = data.points[0];
+            const [y, x] = point.pointIndex;
+            this.handleProjectionClick(x, y);
+        });
+
+    }
+
+    async getRandomRegionFromRandomExperiment() {
+        const region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
+            let region;
+            if (data['region'] === null) {
+                // No more regions to label
                 window.location = `http://localhost:${PORT}/done.html`;
             } else {
                 this.experiment_id = data['experiment_id'];
-                this.roi = data['roi'];
-                roi = this.roi;
+                this.region = data['region'];
+                region = this.region;
             }
-            return roi;
+            return region;
         });
         
-        if (roi['roi'] !== null) {
-            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.roi));
+        if (region['region'] !== null) {
+            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.region));
             this.fovBounds = fovBounds;
         }
 
-        return roi;
+        return region;
 
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`;
-        this.loadingIndicator.add('Loading trace...');
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`;
 
         return $.get(url, data => {
             const trace = {
@@ -115,37 +121,34 @@ class CellLabelingApp {
             if (this.is_video_shown) {
                 $('button#trim_video_to_timeframe').attr('disabled', false);
             }
-
-            this.loadingIndicator.remove('Loading trace...');
         });
     }
 
     async toggleContoursOnProjection() {
         let roi_contours = this.roi_contours;
 
+        if (this.discrepancy_roi_contours !== null) {
+            // If we are in the state of reviewing ROIs with labels
+            // that disagree with the classifier
+            roi_contours = this.discrepancy_roi_contours;
+        }
+
         if (roi_contours === null) {
-            this.loadingIndicator.add('Loading current roi contour...');
             $("#projection_include_mask_outline").attr("disabled", true);
-            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=false`;
+            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
             await $.get(url, data => {
                 roi_contours = data['contours'];
-    
+                roi_contours = roi_contours.filter(x => x['contour'].length > 0);
+                this.roi_contours = roi_contours;
+
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
-
-                this.loadingIndicator.remove('Loading current roi contour...');
             });
         }
-        
-        if (!this.show_all_roi_outlines_on_projection) {
-            roi_contours = roi_contours.filter(x => x['id'] == this.roi['id']);
-        } 
-        
-        if (!this.show_current_roi_outline_on_projection) {
-            roi_contours = roi_contours.filter(x => x['id'] != this.roi['id']);
-        }
 
-        roi_contours = roi_contours.filter(x => x['contour'].length > 0);
+        if (!this.show_current_region_roi_contours_on_projection) {
+            roi_contours = [];
+        }
 
 
         const paths = roi_contours.map(obj => {
@@ -167,60 +170,32 @@ class CellLabelingApp {
         });
         const pathStrings = paths.map(x => x.join(' '));
         const colors = roi_contours.map(obj => {
-            let color;
-            if (obj['id'] == this.roi['id']) {
-                color = [255, 0, 0];
-            } else {
-                color = obj['color'];
-            }
-            return color;
+            return this.cells.has(obj['id']) ? [255, 0, 0] : obj['color'];
         });
         
-        const shapes = _.zip(pathStrings, colors).map(obj => {
+        const shapes = _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
+            const line_width = roi_contours[i]['id'] === this.selected_roi ? 4 : 2;
             return {
                 type: 'polyline',
                 path: path,
-                opacity: 0.75,
+                opacity: 1.0,
                 line: {
-                  color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+                    width: line_width,
+                    color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
                 }
             }
         });
 
         Plotly.relayout('projection', {'shapes': shapes});
-        
-        if (this.roi_contours === null) {
-            $("#projection_include_surrounding_rois").attr("disabled", true);
-
-            // Now load all contours in background
-            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_roi_id=${this.roi['id']}&include_all_contours=true`;
-            this.loadingIndicator.add('Loading all roi contours...');
-            return $.get(url, data => {
-
-                // Make sure this request is not from some previous ROI
-                if (!this.is_loading_new_roi && data['contours'][0]['experiment_id'] === this.roi['experiment_id']) {
-                    this.roi_contours = data['contours'];
-
-                    if (this.show_all_roi_outlines_on_projection) {
-                        this.toggleContoursOnProjection();
-                    }
-                    $("#projection_include_surrounding_rois").attr("disabled", false);
-                    this.loadingIndicator.remove('Loading all roi contours...');
-                }
-            });
-        }
-
-        return;
     }
 
     async displayProjection() {
-        this.loadingIndicator.add('Loading projection...');
+        $('#projection-spinner').show();
 
         // Disable projection settings until loaded
         $('#projection_type').attr('disabled', true);
         $("#projection_include_mask_outline").attr("disabled", true);
-        $("#projection_include_surrounding_rois").attr("disabled", true);
         $('#projection_contrast').attr('disabled', true);
         $('button#projection_contrast_reset').attr('disabled', true);
         $('input#projection_contrast_low_quantile').attr('disabled', true);
@@ -248,21 +223,26 @@ class CellLabelingApp {
         
             const trace1 = {
                 z: data,
-                type: 'image'
+                type: 'image',
+                // disable hover tooltip
+                hoverinfo: 'none'
             };
         
             if (this.projection_is_shown) {
                 const layout = document.getElementById('projection').layout;
                 Plotly.react('projection', [trace1], layout);
             } else {
+                const dim = 512;
+                const margin = 30;
+
                 const layout = {
-                    width: 512,
-                    height: 512,
+                    width: dim + margin * 2,
+                    height: dim + margin * 2,
                     margin: {
-                        t: 30,
-                        l: 30,
-                        r: 30,
-                        b: 30
+                        t: margin,
+                        l: margin,
+                        r: margin,
+                        b: margin
                     },
                     xaxis: {
                         range: this.fovBounds['x']
@@ -272,9 +252,15 @@ class CellLabelingApp {
                     }
                 };
 
-                Plotly.newPlot('projection', [trace1], layout).then(() => {
+                const config = {
+                    doubleClick: false
+                };
+
+                Plotly.newPlot('projection', [trace1], layout, config).then(() => {
                     this.projection_is_shown = true;
                 });
+                
+                this.addProjectionListeners();
             }
             
             $('#projection_type').attr('disabled', false);
@@ -284,22 +270,23 @@ class CellLabelingApp {
             $('input#projection_contrast_low_quantile').attr('disabled', false);
             $('input#projection_contrast_high_quantile').attr('disabled', false);
 
-            if (this.roi_contours !== null) {
-                $("#projection_include_surrounding_rois").attr("disabled", false);
-            }
-
-            this.loadingIndicator.remove('Loading projection...');
-
-            this.toggleContoursOnProjection().then(() => {
-                $("#projection_include_surrounding_rois").attr("disabled", false);
-            });
+            await this.toggleContoursOnProjection();
 
             this.updateProjectionContrast();
+
+            $('#projection-spinner').hide();
         });
     }
     
-    async displayVideo() {
-        this.loadingIndicator.add('Loading video...');
+    async displayVideo({videoTimeframe = null} = {}) {
+        /* Renders video
+        
+        Args
+        -----
+        - videoTimeframe:
+            Start, stop of video
+        */
+        $('#video-spinner').show();
 
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
@@ -313,26 +300,23 @@ class CellLabelingApp {
 
         this.is_video_shown = false;
 
-        let videoTimeframe = this.videoTimeframe;
-
         if (videoTimeframe === null) {
-            await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.roi['id']}`)
+            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
             .then(async data => await data.json())
-            .then(data => {
-                videoTimeframe = data['timeframe'];
-            });
+            .then(data => data['timeframe']);
         }
 
-        this.videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
+        videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
 
         const url = `http://localhost:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
-            roi_id: this.roi['id'],
+            roi_id: this.selected_roi,
+            region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
-            timeframe: this.videoTimeframe
+            timeframe: videoTimeframe
         };
         return $.ajax({
             xhrFields: {
@@ -345,7 +329,7 @@ class CellLabelingApp {
             const blob = new Blob([response], {type: "video\/mp4"});
             const blobUrl = URL.createObjectURL(blob);
             const video = `
-                <video controls id="movie" width="452" height="452" src=${blobUrl}></video>
+                <video controls id="movie" width="512" height="512" src=${blobUrl}></video>
             `;
             $('#video_container').html($(video));
 
@@ -356,10 +340,10 @@ class CellLabelingApp {
                 $('button#trim_video_to_timeframe').attr('disabled', false);
             }
 
-            $('#timestep_display').text(`Timesteps: ${this.videoTimeframe[0]} - ${this.videoTimeframe[1]}`);
+            $('#timestep_display').text(`Timesteps: ${videoTimeframe[0]} - ${videoTimeframe[1]}`);
 
             this.is_video_shown = true;
-            this.loadingIndicator.remove('Loading video...');
+            $('#video-spinner').hide();
         })
     }
 
@@ -368,117 +352,127 @@ class CellLabelingApp {
         const timesteps = trace.layout.xaxis.range;
 
         if (timesteps[1] - timesteps[0] > 3000) {
-            let alert = `
-                <div class="alert alert-danger fade show" role="alert" style="margin-top: 20px" id="alert-error">
-                    The selected timeframe is too large. Please limit to 3000 by selecting a timeframe from the trace
-                </div>`;
-            alert = $(alert);
-
-            alert.insertBefore($('#label_bar'));
-            
-            setTimeout(() => $('#alert-error').alert('close'), 10000);
+            const msg = 'The selected timeframe is too large. Please limit to 3000 by selecting a timeframe from the trace';
+            displayTemporaryAlert({msg, type: 'danger'});
             return;
         }
-        this.videoTimeframe = timesteps;
-        this.displayVideo();
+        this.displayVideo({videoTimeframe: timesteps});
     }
 
-    displayArtifacts() {
-        return Promise.all([
-            this.displayVideo(),
-            this.displayProjection(),
-            this.displayTrace()
-        ]);
+    displayArtifacts({includeProjection = true, includeVideo = false, includeTrace = false} = {}) {
+        const artifactLoaders = [];
+        if (includeProjection) {
+            artifactLoaders.push(this.displayProjection());
+        }
+
+        if (includeVideo) {
+            artifactLoaders.push(this.displayVideo());
+        }
+
+        if (includeTrace) {
+            artifactLoaders.push(this.displayTrace());
+        }
+
+        return Promise.all(artifactLoaders);
     }
 
     initialize() {
-        this.show_current_roi_outline_on_projection = $('#projection_include_mask_outline').is(':checked');
-        this.show_all_roi_outlines_on_projection = $('#projection_include_surrounding_rois').is(':checked');
+        this.show_current_region_roi_contours_on_projection = $('#projection_include_mask_outline').is(':checked');
         this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
         this.show_all_roi_outlines_on_movie = $('#video_include_surrounding_rois').is(':checked');
         this.is_trace_shown = false;
         this.is_video_shown = false;
         this.roi_contours = null;
+        this.discrepancy_roi_contours = null;
         this.fovBounds = null;
-        this.videoTimeframe = null;
         this.experiment_id = null;
         this.projection_is_shown = false;
         this.projection_raw = null;
-        this.roi = null;
-        this.is_loading_new_roi = false;
-        this.loadingIndicator = new LoadingIndicator();
+        this.region = null;
+        this.is_loading_new_region = false;
+        this.cells = new Set();
+        this.selected_roi = null;
+        this.notes = new Map();
+        this.resetSideNav();
 
-        $('button#submit_label').attr('disabled', true);
+        $('button#submit_labels').attr('disabled', true);
+
+        // Disable all the video settings (video not loaded yet)
+        $('#video_include_mask_outline').attr("disabled", true);
+        $('#video_include_surrounding_rois').attr("disabled", true);
+        $('#trim_video_to_timeframe').attr("disabled", true);
+
+        $('#timestep_display').text('');
     }
 
-    async loadNewRoi() {
+    async loadNewRegion() {
         $('#movie').remove();
         this.initialize();
-        this.is_loading_new_roi = true;
+        this.is_loading_new_region = true;
         $('#loading_text').css('display', 'inline');
 
-        const roi = await this.getRandomRoiFromRandomExperiment()
-        .then(roi => {
-            this.is_loading_new_roi = false;
-            $('button#submit_label').attr('disabled', false);
-            return roi;
+        const region = await this.getRandomRegionFromRandomExperiment()
+        .then(region => {
+            this.is_loading_new_region = false;
+            return region;
         })
         .catch(() => {
             $('#loading_text').hide();
-
-            let alert = `
-                <div class="alert alert-danger fade show" role="alert" style="margin-top: 20px" id="alert-error">
-                    Error loading ROI
-                </div>`;
-            alert = $(alert);
-
-            alert.insertBefore($('#label_bar'));
-            
-            setTimeout(() => $('#alert-error').alert('close'), 10000);
+            displayTemporaryAlert({msg: 'Error loading region', type: 'danger'});
         });
-        if (roi['roi'] !== null) {
-            this.displayArtifacts();
+        if (region['region'] !== null) {
+            return this.displayArtifacts().then(() => {
+                $('button#submit_labels').attr('disabled', false);
+            })
         }
     }
 
-    submitLabel() {
-        const url = `http://localhost:${PORT}/add_label`;
-        if (!($('#label_cell').is(':checked') || $('#label_not_cell').is(':checked'))) {
-            return Promise.reject('label is not checked');
-        }
-        $('button#submit_label').attr('disabled', true);
-        const label = $('#label_cell').is(':checked') === true ? 'cell' : 'not cell';
-        let notes = $('#notes').val();
-        if (!notes) {
-            notes = null;
-        }
+    submitRegion() {
+        const url = `http://localhost:${PORT}/submit_region`;
+
+        const roi_extra = Array.from(this.notes).map(x => {
+            const [roi_id, notes] = x;
+            return {
+                roi_id,
+                notes
+            };
+        });
+
         const data = {
-            experiment_id: this.experiment_id,
-            roi_id: this.roi['id'],
-            label: label,
-            notes
+            region_id: this.region['id'],
+            labels: [
+                ...Array.from(this.cells).map(x => {
+                    return {
+                        roi_id: x, 
+                        label: 'cell'
+                    }
+                }),
+                ...this.roi_contours
+                .map(x => x['id'])
+                .filter(x => !this.cells.has(x['id']))
+                .map(x => {
+                    return {
+                        roi_id: x, 
+                        label: 'not cell'
+                    }
+                })
+            ],
+            roi_extra
         };
-        this.loadingIndicator.add('Submitting...');
-        return $.post(url, JSON.stringify(data)).then(() => {
-            $('#label_cell').prop('checked', false);
-            $('#label_not_cell').prop('checked', false);
-            $('#notes').val(null);
-            this.loadingIndicator.remove('Submitting...');
+        return $.post(url, JSON.stringify(data))
+        .then(() => {
+            displayTemporaryAlert({msg: 'Successfully submitted labels for region<br>Loading next region', type: 'success'});
         })
+        .catch(() => {
+            displayTemporaryAlert({msg: 'Error submitting labels for region', type: 'danger'});
+            throw Error();
+        });
     }
 
     displayLoginMessage() {
         $.get('/users/getCurrentUser').then(data => {
             const username = data['user_id'];
-            let alert = `
-                <div class="alert alert-info fade show" role="alert" style="margin-top: 20px" id="alert-error">
-                    Logged in as ${username}
-                </div>`;
-            alert = $(alert);
-
-            alert.insertBefore($('#label_bar'));
-            
-            setTimeout(() => $('#alert-error').alert('close'), 5000);
+            displayTemporaryAlert({msg: `Logged in as ${username}`, type: 'info'});
         });
     }
 
@@ -495,7 +489,9 @@ class CellLabelingApp {
 
         const trace1 = {
             z: x,
-            type: 'image'
+            type: 'image',
+            // disable hover tooltip 
+            hoverinfo: 'none'
         };
 
         const layout = document.getElementById('projection').layout;
@@ -506,9 +502,196 @@ class CellLabelingApp {
     resetProjectionContrast() {
         this.updateProjectionContrast();
     }
+
+    async handleProjectionClick(x, y) {
+        /* 
+        Args
+        ------
+        - x: x coordinate in fov of click
+        - y: y coordinate in fov of click
+        */
+        let postData = {
+            current_region_id: this.region['id'],
+            roi_ids: this.roi_contours.map(roi => roi['id']),
+            coordinates: [x, y]
+        }
+        postData = JSON.stringify(postData);
+        
+        
+        const res = await fetch(`http://localhost:${PORT}/find_roi_at_coordinates`, 
+            {   method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: postData
+            }).then(response => {
+                return response.json();
+            });
+        
+        if (res['roi_id'] === null) {
+            // No ROI clicked. Do nothing
+            return;
+        }
+        
+        const getClassifierProbabilityTextColor = () => {
+            const labelColor = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['color'];
+            return `rgb(${labelColor.join(', ')})`
+        }
+
+        const getClassifierScore = () => {
+            const score = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['classifier_score'];
+            return score.toFixed(2);
+        }
+
+        if (this.selected_roi === res['roi_id']) {
+            if (this.cells.has(res['roi_id'])) {
+                // Transition to "not cell"
+                this.cells.delete(res['roi_id']);
+                this.selected_roi = res['roi_id'];
+            } else {
+                // Transition to "cell"
+                this.cells.add(res['roi_id']);
+            }
+
+        } else {
+            // Select ROI
+            this.selected_roi = res['roi_id'];
+            $('#roi-sidenav #this-roi').text(`ROI ${this.selected_roi}`);
+            $('#roi-sidenav > *').attr('disabled', false);
+            $('#roi-sidenav #notes').attr('disabled', false);
+
+            if (this.notes.has(this.selected_roi)) {
+                $('#notes').val(this.notes.get(this.selected_roi));
+            } else {
+                $('#notes').val('');
+            }
+        }
+
+        const labelText = this.cells.has(res['roi_id']) ? 'Cell' : 'Not Cell';
+        $('#roi-sidenav #roi-label').text(labelText);
+        $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
+        $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
+        
+        // Redraw the contours
+        this.toggleContoursOnProjection();
+
+    }
+
+    resetSideNav() {
+        $('#roi-sidenav #this-roi').text('No ROI selected');
+        $('#roi-sidenav > *').attr('disabled', true);
+        $('#roi-sidenav #notes').attr('disabled', true);
+        $('#roi-classifier-score').text('');
+        $('#roi-label').text('');
+        $('#notes').val('');
+
+    }
+
+    handleNotes() {
+        /* Handles a notes textbox change */
+        const notes = $('#notes').val();
+        this.notes.set(this.selected_roi, notes);
+    }
+
+    handleSubmitRegion({userHasReviewed = false} = {}) {
+        /* Handles submit labels button click 
+        
+        Args
+        ------
+        - userHasReviewed:
+            Whether the user has reviewed any label-classifier 
+            discrepancies and chose to ignore them
+        */
+        $('button#submit_labels').attr('disabled', true);
+
+        if (!userHasReviewed) {
+            const isValid = this.validateLabels();
+            if (!isValid) {
+                $('button#submit_labels').attr('disabled', false);
+                return;
+            }
+        }
+
+        this.submitRegion().then(() => {
+            this.loadNewRegion();
+        }).catch(e => {
+            $('button#submit_labels').attr('disabled', false);
+        });
+    }
+
+    validateLabels() {
+        /* Flags any rois which might have been incorrectly labeled.
+        Any rois with a label that disagrees with the classifier score are flagged */
+        const maybeCell = this.roi_contours
+            .filter(x => x['classifier_score'] >= 0.5 & !this.cells.has(x['id']));
+        const maybeNotCell = this.roi_contours
+            .filter(x => x['classifier_score'] < 0.5 & this.cells.has(x['id']));
+
+        if (maybeCell.length > 0 | maybeNotCell.length > 0) {
+            const msgs = [];
+            const helpingVerb = count => count === 1 ? 'is' : 'are';
+            const roiStr = count => count === 1 ? 'ROI' : 'ROIs';
+            if (maybeCell.length > 0) {
+                msgs.push(`There ${helpingVerb(maybeCell.length)} <b>${maybeCell.length}</b> 
+                    ${roiStr(maybeCell.length)} labeled as "Not Cell" that the classifier thinks ${helpingVerb(maybeCell.length)} cell.`);
+            }
+
+            if (maybeNotCell.length > 0) {
+                msgs.push(`There ${helpingVerb(maybeNotCell.length)} <b>${maybeNotCell.length}</b> 
+                    ${roiStr(maybeNotCell.length)} labeled as "Cell" that the classifier thinks ${helpingVerb(maybeNotCell.length)} not cell.`);
+            }
+
+            const msg = msgs.join('<br><br>');
+
+            const modalHtml = `
+                <div class="modal" tabindex="-1" id="review-modal">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Review</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="review-modal-close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>${msg}</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="submit-anyway">Submit anyway</button>
+                                <button type="button" class="btn btn-primary" id="review">Review these ROIs</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#modal-review-container').html(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('review-modal'));
+            modal.show();
+
+            $('#review-modal-close').click(() => {
+                modal.hide();
+            });
+
+            $('#review-modal #submit-anyway').click(() => {
+                this.handleSubmitRegion({userHasReviewed: true});
+                modal.hide();
+            });
+
+            $('#review-modal #review').click(() => {
+                this.discrepancy_roi_contours = [...maybeCell, ...maybeNotCell];
+                this.toggleContoursOnProjection().then(() => {
+                    modal.hide();
+                });
+            });
+
+            return false;
+        }
+
+        return true;
+        
+    }
 }
 
 $( document ).ready(async function() {
     const app = new CellLabelingApp();
-    app.loadNewRoi();
+    app.loadNewRegion();
 });
