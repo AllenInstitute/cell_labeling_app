@@ -96,7 +96,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.get('roiId')}`;
 
         return $.get(url, data => {
             const trace = {
@@ -175,7 +175,7 @@ class CellLabelingApp {
         
         const shapes = _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
-            const line_width = roi_contours[i]['id'] === this.selected_roi ? 4 : 2;
+            const line_width = roi_contours[i]['id'] === this.selected_roi.get('roiId') ? 4 : 2;
             return {
                 type: 'polyline',
                 path: path,
@@ -301,7 +301,7 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi}`)
+            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.get('roiId')}`)
             .then(async data => await data.json())
             .then(data => data['timeframe']);
         }
@@ -311,7 +311,7 @@ class CellLabelingApp {
         const url = `http://localhost:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
-            roi_id: this.selected_roi,
+            roi_id: this.selected_roi['roi_id'],
             region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
@@ -376,6 +376,30 @@ class CellLabelingApp {
         return Promise.all(artifactLoaders);
     }
 
+    displayClickedPointOnProjection(x, y, radius = 2) {
+        /* 
+            Args
+            ------
+            - x: x coordinate in fov of click
+            - y: y coordinate in fov of click
+        */
+        const shape = {
+                type: 'circle',
+                opacity: 1.0,
+                color: 'rgb(255, 0, 0)',
+                fillcolor: 'rgb(255, 0, 0',
+                x0: x - radius,
+                x1: x + radius,
+                y0: y - radius,
+                y1: y + radius
+            };
+        const shapes = document.getElementById('projection').layout.shapes
+            // Only currently selected point should be shown
+            .filter(x => x['type'] !== 'circle');
+        shapes.push(shape);
+        Plotly.relayout('projection', {'shapes': shapes});
+    }
+
     initialize() {
         this.show_current_region_roi_contours_on_projection = $('#projection_include_mask_outline').is(':checked');
         this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
@@ -391,7 +415,7 @@ class CellLabelingApp {
         this.region = null;
         this.is_loading_new_region = false;
         this.cells = new Set();
-        this.selected_roi = null;
+        this.selected_roi = new Map();
         this.notes = new Map();
         this.resetSideNav();
 
@@ -527,53 +551,96 @@ class CellLabelingApp {
             }).then(response => {
                 return response.json();
             });
-        
+
         if (res['roi_id'] === null) {
-            // No ROI clicked. Do nothing
-            return;
+            this.#handleNonSegmentedPointClick({x, y});
+        } else {
+            this.#handleSegmentedPointClick({roi_id: res['roi_id'], x, y});
         }
-        
-        const getClassifierProbabilityTextColor = () => {
-            const labelColor = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['color'];
-            return `rgb(${labelColor.join(', ')})`
-        }
+    }
 
-        const getClassifierScore = () => {
-            const score = this.roi_contours.filter(x => x['id'] === res['roi_id'])[0]['classifier_score'];
-            return score.toFixed(2);
-        }
+    #handleSegmentedPointClick({roi_id, x, y} = {}) {
+        /* Handles when the user clicks on a point with a computed boundary */
+        const roi = new Map(Object.entries({
+            isSegmented: true,
+            roiId: roi_id,
+            point: null
+        }));
 
-        if (this.selected_roi === res['roi_id']) {
-            if (this.cells.has(res['roi_id'])) {
+        if (this.selected_roi.get('roiId') === roi_id) {
+            // Clicking the currently selected ROI again
+            if (this.cells.has(roi_id)) {
                 // Transition to "not cell"
-                this.cells.delete(res['roi_id']);
-                this.selected_roi = res['roi_id'];
+                this.cells.delete(roi_id);
+                this.selected_roi = roi;
             } else {
                 // Transition to "cell"
-                this.cells.add(res['roi_id']);
+                this.cells.add(roi_id);
             }
 
         } else {
-            // Select ROI
-            this.selected_roi = res['roi_id'];
-            $('#roi-sidenav #this-roi').text(`ROI ${this.selected_roi}`);
-            $('#roi-sidenav > *').attr('disabled', false);
-            $('#roi-sidenav #notes').attr('disabled', false);
-
-            if (this.notes.has(this.selected_roi)) {
-                $('#notes').val(this.notes.get(this.selected_roi));
-            } else {
-                $('#notes').val('');
-            }
+            // Select a new ROI
+            this.selected_roi = roi;
         }
-
-        const labelText = this.cells.has(res['roi_id']) ? 'Cell' : 'Not Cell';
-        $('#roi-sidenav #roi-label').text(labelText);
-        $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
-        $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         
+        this.#updateSideNav();
+
         // Redraw the contours
         this.toggleContoursOnProjection();
+    }
+
+    #handleNonSegmentedPointClick({x, y} = {}) {
+        /* Handles when the user clicks on a point that has no computed boundary 
+        Args
+        ------
+        - x: x coordinate in fov of click
+        - y: y coordinate in fov of click
+        */
+        this.selected_roi = new Map(Object.entries({
+            isSegmented: false,
+
+            // Give the selected roi a fake roi id by making it 1 more than all the existing roi ids.
+            roiId: Math.max(...this.roi_contours.map(x => x['id'])) + 1,
+            point: [x, y]
+        })); 
+        this.resetSideNav();
+        this.#updateSideNav();
+        this.displayClickedPointOnProjection(x, y);
+    }
+
+    #updateSideNav() {
+        /* Updates the sidenav because a new point has been clicked */ 
+        const point = this.selected_roi.get('point');
+        const roi_id = this.selected_roi.get('roiId');
+        const isSegmented = this.selected_roi.get('isSegmented');
+        const roiText = isSegmented ? `ROI ${roi_id}` : `ROI at point ${point}`;
+        $('#roi-sidenav #this-roi').text(roiText);
+        $('#roi-sidenav > *').attr('disabled', false);
+        $('#roi-sidenav #notes').attr('disabled', false);
+        
+        if (this.notes.has(roi_id)) {
+            $('#notes').val(this.notes.get(roi_id));
+        } else {
+            $('#notes').val('');
+        }
+
+        const getClassifierScore = () => {
+            const score = this.roi_contours.filter(x => x['id'] === roi_id)[0]['classifier_score'];
+            return score.toFixed(2);
+        }
+
+        const getClassifierProbabilityTextColor = () => {
+            const labelColor = this.roi_contours.filter(x => x['id'] === roi_id)[0]['color'];
+            return `rgb(${labelColor.join(', ')})`
+        }
+
+        const labelText = this.cells.has(roi_id) ? 'Cell' : 'Not Cell';
+        $('#roi-sidenav #roi-label').text(labelText);
+
+        if (this.selected_roi.get('isSegmented')) {
+            $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
+            $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
+        }
 
     }
 
@@ -590,7 +657,7 @@ class CellLabelingApp {
     handleNotes() {
         /* Handles a notes textbox change */
         const notes = $('#notes').val();
-        this.notes.set(this.selected_roi, notes);
+        this.notes.set(this.selected_roi.get('roiId'), notes);
     }
 
     handleSubmitRegion({userHasReviewed = false} = {}) {
