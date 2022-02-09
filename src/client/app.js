@@ -6,6 +6,10 @@ import {
     displayTemporaryAlert
 } from './util.js';
 
+import {
+    ROI
+} from './roi.js';
+
 
 class CellLabelingApp {
     /* Main App class */
@@ -96,7 +100,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.get('roiId')}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}`;
 
         return $.get(url, data => {
             const trace = {
@@ -125,21 +129,28 @@ class CellLabelingApp {
     }
 
     async toggleContoursOnProjection() {
-        let roi_contours = this.roi_contours;
+        let rois = this.rois;
 
-        if (this.discrepancy_roi_contours !== null) {
+        if (this.discrepancy_rois !== null) {
             // If we are in the state of reviewing ROIs with labels
             // that disagree with the classifier
-            roi_contours = this.discrepancy_roi_contours;
+            rois = this.discrepancy_rois;
         }
 
-        if (roi_contours === null) {
+        if (rois === null) {
             $("#projection_include_mask_outline").attr("disabled", true);
             const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
             await $.get(url, data => {
-                roi_contours = data['contours'];
-                roi_contours = roi_contours.filter(x => x['contour'].length > 0);
-                this.roi_contours = roi_contours;
+                rois = data['contours'].map(x => new ROI({
+                    id: x['id'],
+                    experiment_id: x['experiment_id'],
+                    color: x['color'],
+                    classifier_score: x['classifier_score'],
+                    label: 'not cell',
+                    contour: x['contour']
+                }));
+                rois = rois.filter(x => x.contour.length > 0);
+                this.rois = rois;
 
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
@@ -147,12 +158,12 @@ class CellLabelingApp {
         }
 
         if (!this.show_current_region_roi_contours_on_projection) {
-            roi_contours = [];
+            rois = [];
         }
 
 
-        const paths = roi_contours.map(obj => {
-            return obj['contour'].map((coordinate, index) => {
+        const paths = rois.map(obj => {
+            return obj.contour.map((coordinate, index) => {
                 let instruction;
                 const [x, y] = coordinate;
                 if (index == 0) {
@@ -169,13 +180,16 @@ class CellLabelingApp {
             });
         });
         const pathStrings = paths.map(x => x.join(' '));
-        const colors = roi_contours.map(obj => {
-            return this.cells.has(obj['id']) ? [255, 0, 0] : obj['color'];
+        const colors = rois.map(obj => {
+            return obj.label === 'cell' ? [255, 0, 0] : obj.color;
         });
         
         const shapes = _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
-            const line_width = roi_contours[i]['id'] === this.selected_roi.get('roiId') ? 4 : 2;
+            let line_width = 2;
+            if(this.selected_roi !== null && rois[i].id === this.selected_roi.id) {
+                line_width = 4;
+            }
             return {
                 type: 'polyline',
                 path: path,
@@ -301,7 +315,7 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.get('roiId')}`)
+            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}`)
             .then(async data => await data.json())
             .then(data => data['timeframe']);
         }
@@ -311,7 +325,7 @@ class CellLabelingApp {
         const url = `http://localhost:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
-            roi_id: this.selected_roi['roi_id'],
+            roi_id: this.selected_roi.id,
             region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
@@ -376,27 +390,27 @@ class CellLabelingApp {
         return Promise.all(artifactLoaders);
     }
 
-    displayClickedPointOnProjection(x, y, radius = 2) {
-        /* 
-            Args
-            ------
-            - x: x coordinate in fov of click
-            - y: y coordinate in fov of click
-        */
-        const shape = {
-                type: 'circle',
-                opacity: 1.0,
-                color: 'rgb(255, 0, 0)',
-                fillcolor: 'rgb(255, 0, 0',
-                x0: x - radius,
-                x1: x + radius,
-                y0: y - radius,
-                y1: y + radius
-            };
-        const shapes = document.getElementById('projection').layout.shapes
-            // Only currently selected point should be shown
+    displayClickedPointOnProjection(radius = 2) {
+        const points = this.rois
+            // Filter out all segmented ROIs to leave just the points
+            .filter(x => x.contour === null)
+            .map(roi => {
+                const [x, y] = roi.point;
+                return {
+                    type: 'circle',
+                    opacity: 1.0,
+                    fillcolor: roi.color,
+                    x0: x - radius,
+                    x1: x + radius,
+                    y0: y - radius,
+                    y1: y + radius
+                }
+
+            });
+
+        const contours = document.getElementById('projection').layout.shapes
             .filter(x => x['type'] !== 'circle');
-        shapes.push(shape);
+        const shapes = [...contours, ...points];
         Plotly.relayout('projection', {'shapes': shapes});
     }
 
@@ -406,16 +420,15 @@ class CellLabelingApp {
         this.show_all_roi_outlines_on_movie = $('#video_include_surrounding_rois').is(':checked');
         this.is_trace_shown = false;
         this.is_video_shown = false;
-        this.roi_contours = null;
-        this.discrepancy_roi_contours = null;
+        this.rois = null;
+        this.discrepancy_rois = null;
         this.fovBounds = null;
         this.experiment_id = null;
         this.projection_is_shown = false;
         this.projection_raw = null;
         this.region = null;
         this.is_loading_new_region = false;
-        this.cells = new Set();
-        this.selected_roi = new Map();
+        this.selected_roi = null;
         this.notes = new Map();
         this.resetSideNav();
 
@@ -465,19 +478,12 @@ class CellLabelingApp {
         const data = {
             region_id: this.region['id'],
             labels: [
-                ...Array.from(this.cells).map(x => {
+                this.rois.map(x => {
                     return {
-                        roi_id: x, 
-                        label: 'cell'
-                    }
-                }),
-                ...this.roi_contours
-                .map(x => x['id'])
-                .filter(x => !this.cells.has(x['id']))
-                .map(x => {
-                    return {
-                        roi_id: x, 
-                        label: 'not cell'
+                        roi_id: x.id,
+                        is_segmented: x.contour !== null,
+                        point: x.point, 
+                        label: x.label
                     }
                 })
             ],
@@ -536,7 +542,7 @@ class CellLabelingApp {
         */
         let postData = {
             current_region_id: this.region['id'],
-            roi_ids: this.roi_contours.map(roi => roi['id']),
+            roi_ids: this.rois.map(roi => roi.id),
             coordinates: [x, y]
         }
         postData = JSON.stringify(postData);
@@ -567,15 +573,21 @@ class CellLabelingApp {
             point: null
         }));
 
-        if (this.selected_roi.get('roiId') === roi_id) {
+        const cell_roi_ids = new Set(
+            this.rois.filter(x => x.label === 'cell')
+            .map(x => x.id)
+        );
+
+        if (this.selected_roi.id === roi_id) {
+            const idx = this.rois.findIndex(x => x.id === roi_id);
             // Clicking the currently selected ROI again
-            if (this.cells.has(roi_id)) {
+            if (cell_roi_ids.has(roi_id)) {
                 // Transition to "not cell"
-                this.cells.delete(roi_id);
+                this.rois[idx].label = 'not cell';
                 this.selected_roi = roi;
             } else {
                 // Transition to "cell"
-                this.cells.add(roi_id);
+                this.rois[idx].label = 'cell';
             }
 
         } else {
@@ -596,23 +608,65 @@ class CellLabelingApp {
         - x: x coordinate in fov of click
         - y: y coordinate in fov of click
         */
-        this.selected_roi = new Map(Object.entries({
-            isSegmented: false,
+        const isClose = (point1, point2) => {
+            /* Returns true if the newly selected point is 
+            close to the currently selected point 
+        
+            Args
+            -----
+            */
+            const [x1, y1] = point1;
+            const [x2, y2] = point2;
+            const distance = Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+            return distance <= 4;
+        }
+       const closePointIdx = this.rois
+           .findIndex(roi => roi.point !== null &&
+                      isClose(roi.point, [x, y]));
+        let selectedRoi;
+       if (closePointIdx >= 0) {
+           // Clicking on a point that already exists
+           selectedRoi = this.rois[closePointIdx];
+           if (this.rois[closePointIdx].label === 'cell') {
+               this.rois[closePointIdx].label = 'not cell';
+               this.rois[closePointIdx].color = 'rgb(255, 255, 255)'
+           } else {
+               this.rois[closePointIdx].label = 'cell';
+               this.rois[closePointIdx].color = 'rgb(255, 0, 0)'
+           }
 
-            // Give the selected roi a fake roi id by making it 1 more than all the existing roi ids.
-            roiId: Math.max(...this.roi_contours.map(x => x['id'])) + 1,
-            point: [x, y]
-        })); 
+       } else {
+           // Clicking on a new point
+           selectedRoi = new ROI({
+               id: `${x},${y}`,
+               experiment_id: this.experiment_id,
+               color: 'rgb(255, 255, 255)',
+               label: 'not cell',
+               point: [x, y]
+           });
+           this.rois.push(selectedRoi);
+       }
+
+       if (this.selected_roi !== null &&
+           this.selected_roi.label === 'not cell' &&
+           this.selected_roi.id !== selectedRoi.id) {
+           // If we had an ROI selected and it is not a cell, and it is not the current roi,
+           // remove it
+           this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
+        }
+
+       this.selected_roi = selectedRoi;
+
         this.resetSideNav();
         this.#updateSideNav();
-        this.displayClickedPointOnProjection(x, y);
+        this.displayClickedPointOnProjection();
     }
 
     #updateSideNav() {
         /* Updates the sidenav because a new point has been clicked */ 
-        const point = this.selected_roi.get('point');
-        const roi_id = this.selected_roi.get('roiId');
-        const isSegmented = this.selected_roi.get('isSegmented');
+        const point = this.selected_roi.point;
+        const roi_id = this.selected_roi.id;
+        const isSegmented = this.selected_roi.contour !== null;
         const roiText = isSegmented ? `ROI ${roi_id}` : `ROI at point ${point}`;
         $('#roi-sidenav #this-roi').text(roiText);
         $('#roi-sidenav > *').attr('disabled', false);
@@ -625,19 +679,19 @@ class CellLabelingApp {
         }
 
         const getClassifierScore = () => {
-            const score = this.roi_contours.filter(x => x['id'] === roi_id)[0]['classifier_score'];
+            const score = this.rois.filter(x => x.id === roi_id)[0]['classifier_score'];
             return score.toFixed(2);
         }
 
         const getClassifierProbabilityTextColor = () => {
-            const labelColor = this.roi_contours.filter(x => x['id'] === roi_id)[0]['color'];
+            const labelColor = this.rois.filter(x => x.id === roi_id)[0]['color'];
             return `rgb(${labelColor.join(', ')})`
         }
 
-        const labelText = this.cells.has(roi_id) ? 'Cell' : 'Not Cell';
+        const labelText = this.rois.find(x => x.id === roi_id).label === 'cell' ? 'Cell' : 'Not Cell';
         $('#roi-sidenav #roi-label').text(labelText);
 
-        if (this.selected_roi.get('isSegmented')) {
+        if (this.selected_roi.contour !== null) {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
             $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         }
@@ -657,7 +711,7 @@ class CellLabelingApp {
     handleNotes() {
         /* Handles a notes textbox change */
         const notes = $('#notes').val();
-        this.notes.set(this.selected_roi.get('roiId'), notes);
+        this.notes.set(this.selected_roi.id, notes);
     }
 
     handleSubmitRegion({userHasReviewed = false} = {}) {
@@ -689,10 +743,10 @@ class CellLabelingApp {
     validateLabels() {
         /* Flags any rois which might have been incorrectly labeled.
         Any rois with a label that disagrees with the classifier score are flagged */
-        const maybeCell = this.roi_contours
-            .filter(x => x['classifier_score'] >= 0.5 & !this.cells.has(x['id']));
-        const maybeNotCell = this.roi_contours
-            .filter(x => x['classifier_score'] < 0.5 & this.cells.has(x['id']));
+        const maybeCell = this.rois
+            .filter(x => x.classifier_score >= 0.5 & !x.label !== 'cell');
+        const maybeNotCell = this.rois
+            .filter(x => x.classifier_score < 0.5 & x.label === 'cell');
 
         if (maybeCell.length > 0 | maybeNotCell.length > 0) {
             const msgs = [];
@@ -744,7 +798,7 @@ class CellLabelingApp {
             });
 
             $('#review-modal #review').click(() => {
-                this.discrepancy_roi_contours = [...maybeCell, ...maybeNotCell];
+                this.discrepancy_rois = [...maybeCell, ...maybeNotCell];
                 this.toggleContoursOnProjection().then(() => {
                     modal.hide();
                 });
