@@ -570,30 +570,26 @@ class CellLabelingApp {
         if (res['roi_id'] === null) {
             this.#handleNonSegmentedPointClick({x, y});
         } else {
-            this.#handleSegmentedPointClick({roi_id: res['roi_id'], x, y});
+            this.#handleSegmentedPointClick({roi_id: res['roi_id']});
         }
     }
 
-    #handleSegmentedPointClick({roi_id, x, y} = {}) {
+    #handleSegmentedPointClick({roi_id} = {}) {
         /* Handles when the user clicks on a point with a computed boundary */
-        const roi = new Map(Object.entries({
-            isSegmented: true,
-            roiId: roi_id,
-            point: null
-        }));
+        const selectedRoi = this.rois.find(x => x.id == roi_id)
 
         const cell_roi_ids = new Set(
             this.rois.filter(x => x.label === 'cell')
             .map(x => x.id)
         );
 
-        if (this.selected_roi.id === roi_id) {
-            const idx = this.rois.findIndex(x => x.id === roi_id);
+        if (this.selected_roi !== null && this.selected_roi.id === selectedRoi.id) {
+            const idx = this.rois.findIndex(x => x.id === selectedRoi.id);
             // Clicking the currently selected ROI again
-            if (cell_roi_ids.has(roi_id)) {
+            if (cell_roi_ids.has(selectedRoi.id)) {
                 // Transition to "not cell"
                 this.rois[idx].label = 'not cell';
-                this.selected_roi = roi;
+                this.selected_roi = selectedRoi;
             } else {
                 // Transition to "cell"
                 this.rois[idx].label = 'cell';
@@ -601,7 +597,7 @@ class CellLabelingApp {
 
         } else {
             // Select a new ROI
-            this.selected_roi = roi;
+            this.selected_roi = selectedRoi;
         }
         
         this.#updateSideNav();
