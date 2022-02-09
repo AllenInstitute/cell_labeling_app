@@ -22,6 +22,7 @@ class CellLabelingApp {
         $('#projection_include_mask_outline').on('click', () => {
             this.show_current_region_roi_contours_on_projection = !this.show_current_region_roi_contours_on_projection;
             this.toggleContoursOnProjection();
+            this.displayROIPointsOnProjection();
         });
 
         $('#projection_type').on('change', () => {
@@ -393,7 +394,13 @@ class CellLabelingApp {
     }
 
     displayROIPointsOnProjection(radius = 2) {
-        const points = this.rois
+        let rois;
+        if (!this.show_current_region_roi_contours_on_projection) {
+            rois = [];
+        } else {
+            rois = this.rois;
+        }
+        const points = rois
             // Filter out all segmented ROIs to leave just the points
             .filter(x => x.contour === null)
             .map(roi => {
@@ -801,6 +808,7 @@ class CellLabelingApp {
 
             $('#review-modal #review').click(() => {
                 this.discrepancy_rois = [...maybeCell, ...maybeNotCell];
+                this.displayROIPointsOnProjection();
                 this.toggleContoursOnProjection().then(() => {
                     modal.hide();
                 });
