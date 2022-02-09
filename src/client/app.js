@@ -161,23 +161,24 @@ class CellLabelingApp {
             rois = [];
         }
 
+        rois = rois.filter(x => x.contour !== null);
 
         const paths = rois.map(obj => {
-            return obj.contour.map((coordinate, index) => {
-                let instruction;
-                const [x, y] = coordinate;
-                if (index == 0) {
-                    instruction = `M ${x},${y}`;
-                } else {
-                    instruction = `L${x},${y}`;
-                }
+                return obj.contour.map((coordinate, index) => {
+                    let instruction;
+                    const [x, y] = coordinate;
+                    if (index === 0) {
+                        instruction = `M ${x},${y}`;
+                    } else {
+                        instruction = `L${x},${y}`;
+                    }
 
-                if (index == obj['contour'].length - 1) {
-                    instruction = `${instruction} Z`;
-                }
+                    if (index === obj['contour'].length - 1) {
+                        instruction = `${instruction} Z`;
+                    }
 
-                return instruction;
-            });
+                    return instruction;
+                });
         });
         const pathStrings = paths.map(x => x.join(' '));
         const colors = rois.map(obj => {
@@ -285,6 +286,7 @@ class CellLabelingApp {
             $('input#projection_contrast_high_quantile').attr('disabled', false);
 
             await this.toggleContoursOnProjection();
+            this.displayROIPointsOnProjection();
 
             this.updateProjectionContrast();
 
@@ -390,7 +392,7 @@ class CellLabelingApp {
         return Promise.all(artifactLoaders);
     }
 
-    displayClickedPointOnProjection(radius = 2) {
+    displayROIPointsOnProjection(radius = 2) {
         const points = this.rois
             // Filter out all segmented ROIs to leave just the points
             .filter(x => x.contour === null)
@@ -659,7 +661,7 @@ class CellLabelingApp {
 
         this.resetSideNav();
         this.#updateSideNav();
-        this.displayClickedPointOnProjection();
+        this.displayROIPointsOnProjection();
     }
 
     #updateSideNav() {
