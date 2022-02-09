@@ -2,7 +2,7 @@ import base64
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional, List
 
 import cv2
 import h5py
@@ -204,11 +204,18 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
     return all_contours
 
 
-def get_trace(experiment_id: str, roi_id: str):
+def get_trace(experiment_id: str, roi_id: str, point: Optional[List] = None):
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    with h5py.File(artifact_path, 'r') as f:
-        trace = (f['traces'][roi_id][()])
+    if point is None:
+        # retrieve precomputed trace
+        with h5py.File(artifact_path, 'r') as f:
+            trace = (f['traces'][roi_id][()])
+    else:
+        # Just pull the argmax, pulling the whole trace too expensive
+        x, y = point
+        with h5py.File(artifact_path, 'r') as f:
+            trace = (f['video_data'][:][:, y, x])
     return trace
 
 

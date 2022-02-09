@@ -5,7 +5,8 @@ from io import BytesIO
 import h5py
 import numpy as np
 from PIL import Image
-from flask import render_template, request, send_file, Blueprint, current_app
+from flask import render_template, request, send_file, Blueprint, current_app, \
+    Request
 from flask_login import current_user
 from ophys_etl.modules.segmentation.qc_utils.video_generator import \
     VideoGenerator
@@ -135,10 +136,7 @@ def get_projection():
 
 @api.route('/get_trace')
 def get_trace():
-    experiment_id = request.args['experiment_id']
-    roi_id = request.args['roi_id']
-
-    trace = util.get_trace(experiment_id=experiment_id, roi_id=roi_id)
+    trace = _get_trace(request=request)
 
     # Trace seems to decrease to 0 at the end which makes visualization worse
     # Trim to last nonzero index
@@ -195,10 +193,7 @@ def get_video():
 
 @api.route('/get_default_video_timeframe')
 def get_default_video_timeframe():
-    experiment_id = request.args['experiment_id']
-    roi_id = request.args['roi_id']
-
-    trace = util.get_trace(experiment_id=experiment_id, roi_id=roi_id)
+    trace = _get_trace(request=request)
 
     max_idx = trace.argmax()
     start = float(max_idx - 300)
@@ -331,3 +326,23 @@ def after_request(response):
     header = response.headers
     header['Access-Control-Allow-Origin'] = '*'
     return response
+
+
+def _get_trace(request: Request) -> np.ndarray:
+    """
+
+    :param request: The flask request
+    :return:
+        trace, np.ndarray, or none if non-computed trace
+        is requested """
+    experiment_id = request.args['experiment_id']
+    roi_id = request.args['roi_id']
+    if ',' in roi_id:
+        # It is a point, rather than a segmented ROI
+        point = [int(x) for x in roi_id.split(',')]
+    else:
+        point = None
+    trace = util.get_trace(experiment_id=experiment_id,
+                           roi_id=roi_id, point=point)
+    return trace
+
