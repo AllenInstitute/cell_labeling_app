@@ -19,10 +19,9 @@ class CellLabelingApp {
     }
 
     addListeners() {
-        $('#projection_include_mask_outline').on('click', () => {
+        $('#projection_include_mask_outline').on('click', async () => {
             this.show_current_region_roi_contours_on_projection = !this.show_current_region_roi_contours_on_projection;
-            this.toggleContoursOnProjection();
-            this.displayROIPointsOnProjection();
+            await this.updateShapesOnProjection();
         });
 
         $('#projection_type').on('change', () => {
@@ -286,8 +285,7 @@ class CellLabelingApp {
             $('input#projection_contrast_low_quantile').attr('disabled', false);
             $('input#projection_contrast_high_quantile').attr('disabled', false);
 
-            await this.toggleContoursOnProjection();
-            this.displayROIPointsOnProjection();
+            await this.updateShapesOnProjection();
 
             this.updateProjectionContrast();
 
@@ -573,11 +571,11 @@ class CellLabelingApp {
         if (res['roi_id'] === null) {
             this.#handleNonSegmentedPointClick({x, y});
         } else {
-            this.#handleSegmentedPointClick({roi_id: res['roi_id']});
+            await this.#handleSegmentedPointClick({roi_id: res['roi_id']});
         }
     }
 
-    #handleSegmentedPointClick({roi_id} = {}) {
+    async #handleSegmentedPointClick({roi_id} = {}) {
         /* Handles when the user clicks on a point with a computed boundary */
         const selectedRoi = this.rois.find(x => x.id == roi_id)
 
@@ -606,7 +604,7 @@ class CellLabelingApp {
         this.#updateSideNav();
 
         // Redraw the contours
-        this.toggleContoursOnProjection();
+        await this.toggleContoursOnProjection();
     }
 
     #handleNonSegmentedPointClick({x, y} = {}) {
@@ -807,8 +805,7 @@ class CellLabelingApp {
 
             $('#review-modal #review').click(() => {
                 this.discrepancy_rois = [...maybeCell, ...maybeNotCell];
-                this.displayROIPointsOnProjection();
-                this.toggleContoursOnProjection().then(() => {
+                this.updateShapesOnProjection().then(() => {
                     modal.hide();
                 });
             });
@@ -818,6 +815,11 @@ class CellLabelingApp {
 
         return true;
         
+    }
+
+    async updateShapesOnProjection() {
+        await this.toggleContoursOnProjection();
+        this.displayROIPointsOnProjection();
     }
 }
 
