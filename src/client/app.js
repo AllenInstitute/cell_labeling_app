@@ -185,7 +185,7 @@ class CellLabelingApp {
             return obj.label === 'cell' ? [255, 0, 0] : obj.color;
         });
         
-        const shapes = _.zip(pathStrings, colors).map((obj, i) => {
+        return _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
             let line_width = 2;
             if(this.selected_roi !== null && rois[i].id === this.selected_roi.id) {
@@ -201,8 +201,6 @@ class CellLabelingApp {
                 }
             }
         });
-
-        Plotly.relayout('projection', {'shapes': shapes});
     }
 
     async displayProjection() {
@@ -417,11 +415,7 @@ class CellLabelingApp {
                 }
 
             });
-
-        const contours = document.getElementById('projection').layout.shapes
-            .filter(x => x['type'] !== 'circle');
-        const shapes = [...contours, ...points];
-        Plotly.relayout('projection', {'shapes': shapes});
+        return points;
     }
 
     initialize() {
@@ -569,7 +563,7 @@ class CellLabelingApp {
             });
 
         if (res['roi_id'] === null) {
-            this.#handleNonSegmentedPointClick({x, y});
+            await this.#handleNonSegmentedPointClick({x, y});
         } else {
             await this.#handleSegmentedPointClick({roi_id: res['roi_id']});
         }
@@ -577,12 +571,14 @@ class CellLabelingApp {
 
     async #handleSegmentedPointClick({roi_id} = {}) {
         /* Handles when the user clicks on a point with a computed boundary */
-        const selectedRoi = this.rois.find(x => x.id == roi_id)
+        const selectedRoi = this.rois.find(x => x.id === roi_id)
 
         const cell_roi_ids = new Set(
             this.rois.filter(x => x.label === 'cell')
             .map(x => x.id)
         );
+
+        this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
 
         if (this.selected_roi !== null && this.selected_roi.id === selectedRoi.id) {
             const idx = this.rois.findIndex(x => x.id === selectedRoi.id);
@@ -604,10 +600,10 @@ class CellLabelingApp {
         this.#updateSideNav();
 
         // Redraw the contours
-        await this.toggleContoursOnProjection();
+        await this.updateShapesOnProjection();
     }
 
-    #handleNonSegmentedPointClick({x, y} = {}) {
+    async #handleNonSegmentedPointClick({x, y} = {}) {
         /* Handles when the user clicks on a point that has no computed boundary 
         Args
         ------
@@ -653,19 +649,13 @@ class CellLabelingApp {
            this.rois.push(selectedRoi);
        }
 
-       if (this.selected_roi !== null &&
-           this.selected_roi.label === 'not cell' &&
-           this.selected_roi.id !== selectedRoi.id) {
-           // If we had an ROI selected and it is not a cell, and it is not the current roi,
-           // remove it
-           this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
-        }
+        this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
 
        this.selected_roi = selectedRoi;
 
         this.resetSideNav();
         this.#updateSideNav();
-        this.displayROIPointsOnProjection();
+        await this.updateShapesOnProjection();
     }
 
     #updateSideNav() {
@@ -816,10 +806,26 @@ class CellLabelingApp {
         return true;
         
     }
+    
+    removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
+        if (this.selected_roi !== null &&
+           this.selected_roi.contour === null &&
+           this.selected_roi.label === 'not cell' &&
+           this.selected_roi.id !== selectedRoi.id) {
+           // If we had an ROI selected and it is not a cell,
+           // and it is a nonsegmented point,
+           // and it is not the current roi,
+           // remove it
+           this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
+        }
+    }
 
     async updateShapesOnProjection() {
-        await this.toggleContoursOnProjection();
-        this.displayROIPointsOnProjection();
+        const contours = await this.toggleContoursOnProjection();
+        const points = this.displayROIPointsOnProjection();
+
+        const shapes = [...contours, ...points];
+        Plotly.relayout('projection', {'shapes': shapes});
     }
 }
 
