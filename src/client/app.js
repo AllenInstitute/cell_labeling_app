@@ -100,7 +100,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contour !== null}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`;
 
         return $.get(url, data => {
             const trace = {
@@ -147,9 +147,9 @@ class CellLabelingApp {
                     color: x['color'],
                     classifier_score: x['classifier_score'],
                     label: 'not cell',
-                    contour: x['contour']
+                    contours: x['contours']
                 }));
-                rois = rois.filter(x => x.contour.length > 0);
+                rois = rois.filter(x => x.contours.length > 0);
                 this.rois = rois;
 
                 $("#projection_include_mask_outline").attr("disabled", false);
@@ -161,24 +161,28 @@ class CellLabelingApp {
             rois = [];
         }
 
-        rois = rois.filter(x => x.contour !== null);
+        rois = rois.filter(x => x.contours !== null);
 
         const paths = rois.map(obj => {
-                return obj.contour.map((coordinate, index) => {
-                    let instruction;
-                    const [x, y] = coordinate;
-                    if (index === 0) {
-                        instruction = `M ${x},${y}`;
-                    } else {
-                        instruction = `L${x},${y}`;
-                    }
+                let instructions = obj.contours.map(contours => {
+                    return contours.map((coordinate, index) => {
+                        let instruction;
+                        const [x, y] = coordinate;
+                        if (index === 0) {
+                            instruction = `M ${x},${y}`;
+                        } else {
+                            instruction = `L${x},${y}`;
+                        }
 
-                    if (index === obj['contour'].length - 1) {
-                        instruction = `${instruction} Z`;
-                    }
-
-                    return instruction;
+                        return instruction;
+                    });
                 });
+                // Flatten multiple contours into single instruction set
+                instructions = _.flatten(instructions);
+
+                // Add the end instruction
+                instructions.push('Z');
+                return instructions;
         });
         const pathStrings = paths.map(x => x.join(' '));
         const colors = rois.map(obj => {
@@ -314,7 +318,7 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contour !== null}`)
+            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`)
             .then(async data => await data.json())
             .then(data => data['timeframe']);
         }
@@ -332,7 +336,7 @@ class CellLabelingApp {
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
             timeframe: videoTimeframe,
-            is_segmented: this.selected_roi.contour !== null,
+            is_segmented: this.selected_roi.contours !== null,
         };
         return $.ajax({
             xhrFields: {
@@ -401,7 +405,7 @@ class CellLabelingApp {
         }
         const points = rois
             // Filter out all segmented ROIs to leave just the points
-            .filter(x => x.contour === null)
+            .filter(x => x.contours === null)
             .map(roi => {
                 const [x, y] = roi.point;
                 return {
@@ -481,16 +485,19 @@ class CellLabelingApp {
 
         const data = {
             region_id: this.region['id'],
-            labels: [
-                this.rois.map(x => {
+            labels:
+                this.rois
+                    // Filtering out any currently selected non-cell points
+                    .filter(x => x.contours !== null ||
+                        (x.point !== null && x.label === 'cell'))
+                    .map(x => {
                     return {
                         roi_id: x.id,
-                        is_segmented: x.contour !== null,
+                        is_segmented: x.contours !== null,
                         point: x.point, 
                         label: x.label
                     }
-                })
-            ],
+                }),
             roi_extra
         };
         return $.post(url, JSON.stringify(data))
@@ -671,7 +678,7 @@ class CellLabelingApp {
         /* Updates the sidenav because a new point has been clicked */ 
         const point = this.selected_roi.point;
         const roi_id = this.selected_roi.id;
-        const isSegmented = this.selected_roi.contour !== null;
+        const isSegmented = this.selected_roi.contours !== null;
         const roiText = isSegmented ? `ROI ${roi_id}` : `ROI at point ${point}`;
         $('#roi-sidenav #this-roi').text(roiText);
         $('#roi-sidenav > *').attr('disabled', false);
@@ -701,7 +708,7 @@ class CellLabelingApp {
             $('#roi-sidenav #roi-label').css('color', 'black');
         }
 
-        if (this.selected_roi.contour !== null) {
+        if (this.selected_roi.contours !== null) {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
             $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         }
@@ -837,7 +844,7 @@ class CellLabelingApp {
 
     removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
         if (this.selected_roi !== null &&
-           this.selected_roi.contour === null &&
+           this.selected_roi.contours === null &&
            this.selected_roi.label === 'not cell' &&
            this.selected_roi.id !== selectedRoi.id) {
            // If we had an ROI selected and it is not a cell,

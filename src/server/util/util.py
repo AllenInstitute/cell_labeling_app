@@ -154,7 +154,7 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
     :param reshape_contours_to_list:
     :return:
         dict with keys
-            - contour: list of contour x, y coordinates
+            - contours: list of contour x, y coordinates
             - color: color of contour
             - id: roi id
             - experiment_id: experiment id
@@ -184,23 +184,23 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
                                        cv2.CHAIN_APPROX_NONE)
         if reshape_contours_to_list:
             contours = [
-                x.reshape(x.shape[0], 2).tolist() for x in contours
+                contour.reshape(contour.shape[0], 2).tolist()
+                for contour in contours
             ]
 
         color = get_soft_filter_roi_color(
             classifier_score=roi['classifier_score'])
-        for contour in contours:
-            all_contours.append({
-                'contour': contour,
-                'color': color,
-                'id': id,
-                'classifier_score': classifier_score,
-                'box_x': x,
-                'box_y': y,
-                'box_width': width,
-                'box_height': height,
-                'experiment_id': experiment_id
-            })
+        all_contours.append({
+            'contours': contours,
+            'color': color,
+            'id': id,
+            'classifier_score': classifier_score,
+            'box_x': x,
+            'box_y': y,
+            'box_width': width,
+            'box_height': height,
+            'experiment_id': experiment_id
+        })
     return all_contours
 
 
