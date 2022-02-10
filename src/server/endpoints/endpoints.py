@@ -140,7 +140,9 @@ def get_trace():
 
     # Trace seems to decrease to 0 at the end which makes visualization worse
     # Trim to last nonzero index
-    trace = trace[:trace.nonzero()[0][-1]]
+    nonzero = trace.nonzero()[0]
+    if len(nonzero) > 0:
+        trace = trace[:nonzero[-1]]
 
     trace = trace.tolist()
     return {
