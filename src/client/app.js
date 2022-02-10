@@ -695,6 +695,11 @@ class CellLabelingApp {
 
         const labelText = this.rois.find(x => x.id === roi_id).label === 'cell' ? 'Cell' : 'Not Cell';
         $('#roi-sidenav #roi-label').text(labelText);
+        if (labelText === 'Cell') {
+            $('#roi-sidenav #roi-label').css('color', 'red');
+        } else {
+            $('#roi-sidenav #roi-label').css('color', 'black');
+        }
 
         if (this.selected_roi.contour !== null) {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
