@@ -754,11 +754,11 @@ class CellLabelingApp {
         /* Flags any rois which might have been incorrectly labeled.
         Any rois with a label that disagrees with the classifier score are flagged */
         const maybeCell = this.rois
-            .filter(x => x.classifier_score >= 0.5 & !x.label !== 'cell');
+            .filter(x => x.classifier_score >= 0.5 & x.label !== 'cell');
         const maybeNotCell = this.rois
             .filter(x => x.classifier_score < 0.5 & x.label === 'cell');
 
-        if (maybeCell.length > 0 | maybeNotCell.length > 0) {
+        if (maybeCell.length > 0 || maybeNotCell.length > 0) {
             const msgs = [];
             const helpingVerb = count => count === 1 ? 'is' : 'are';
             const roiStr = count => count === 1 ? 'ROI' : 'ROIs';
