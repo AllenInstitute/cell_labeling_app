@@ -807,14 +807,17 @@ class CellLabelingApp {
         
     }
 
-    displayRegionBoundariesOnProjection() {
-        const shape = {
+    getRegionBoundariesShape() {
+        return {
             type: 'rect',
-            opacity: 1.0,
-            x0: this.region.x,
-            x1: this.region.x + this.region.width,
-            y0: this.region.y,
-            y1: this.region.y + this.region.height
+            opacity: 0.75,
+            line: {
+                color: 'rgb(255, 255, 255)'
+            },
+            y0: this.region.x,
+            y1: this.region.x + this.region.width,
+            x0: this.region.y,
+            x1: this.region.y + this.region.height
         }
     }
 
@@ -834,8 +837,8 @@ class CellLabelingApp {
     async updateShapesOnProjection() {
         const contours = await this.getRoiContourShapes();
         const points = this.getRoiPointShapes();
-
-        const shapes = [...contours, ...points];
+        const regionBoundary = this.getRegionBoundariesShape();
+        const shapes = [...contours, ...points, regionBoundary];
         Plotly.relayout('projection', {'shapes': shapes});
     }
 }
