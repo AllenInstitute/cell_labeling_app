@@ -212,7 +212,7 @@ def get_trace(experiment_id: str, roi_id: str, point: Optional[List] = None):
         with h5py.File(artifact_path, 'r') as f:
             trace = (f['traces'][roi_id][()])
     else:
-        # Just pull the argmax, pulling the whole trace too expensive
+        # Pull the trace from the video for the point
         x, y = point
         with h5py.File(artifact_path, 'r') as f:
             trace = (f['video_data'][:][:, y, x])

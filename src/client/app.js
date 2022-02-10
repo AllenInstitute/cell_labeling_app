@@ -101,7 +101,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}`;
+        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contour !== null}`;
 
         return $.get(url, data => {
             const trace = {
@@ -318,7 +318,7 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}`)
+            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contour !== null}`)
             .then(async data => await data.json())
             .then(data => data['timeframe']);
         }
@@ -329,11 +329,14 @@ class CellLabelingApp {
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.selected_roi.id,
+            point: this.selected_roi.point,
+            color: this.selected_roi.color,
             region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
-            timeframe: videoTimeframe
+            timeframe: videoTimeframe,
+            is_segmented: this.selected_roi.contour !== null,
         };
         return $.ajax({
             xhrFields: {
@@ -408,7 +411,7 @@ class CellLabelingApp {
                 return {
                     type: 'circle',
                     opacity: 1.0,
-                    fillcolor: roi.color,
+                    fillcolor: `rgb(${roi.color.join(',')})`,
                     x0: x - radius,
                     x1: x + radius,
                     y0: y - radius,
@@ -634,10 +637,10 @@ class CellLabelingApp {
            selectedRoi = this.rois[closePointIdx];
            if (this.rois[closePointIdx].label === 'cell') {
                this.rois[closePointIdx].label = 'not cell';
-               this.rois[closePointIdx].color = 'rgb(255, 255, 255)'
+               this.rois[closePointIdx].color = [255, 255, 255]
            } else {
                this.rois[closePointIdx].label = 'cell';
-               this.rois[closePointIdx].color = 'rgb(255, 0, 0)'
+               this.rois[closePointIdx].color = [255, 0, 0]
            }
 
        } else {
@@ -645,7 +648,7 @@ class CellLabelingApp {
            selectedRoi = new ROI({
                id: `${x},${y}`,
                experiment_id: this.experiment_id,
-               color: 'rgb(255, 255, 255)',
+               color: [255, 255, 255],
                label: 'not cell',
                point: [x, y]
            });
