@@ -610,6 +610,15 @@ class CellLabelingApp {
         - x: x coordinate in fov of click
         - y: y coordinate in fov of click
         */
+
+        // Checking if clicked point is outside requested region
+        // Note x and y swapped due to image coordinates
+        if (x < this.region.y || x > this.region.y + this.region.height ||
+            y < this.region.x || y > this.region.x + this.region.width) {
+            const msg = 'The clicked point is outside of the requested region';
+            displayTemporaryAlert({msg, type: 'danger'});
+            return;
+        }
         const isClose = (point1, point2) => {
             /* Returns true if the newly selected point is 
             close to the currently selected point 
