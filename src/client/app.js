@@ -128,7 +128,7 @@ class CellLabelingApp {
         });
     }
 
-    async toggleContoursOnProjection() {
+    async getRoiContourShapes() {
         let rois = this.rois;
 
         if (this.discrepancy_rois !== null) {
@@ -392,7 +392,7 @@ class CellLabelingApp {
         return Promise.all(artifactLoaders);
     }
 
-    displayROIPointsOnProjection(radius = 2) {
+    getRoiPointShapes(radius = 2) {
         let rois;
         if (!this.show_current_region_roi_contours_on_projection) {
             rois = [];
@@ -806,7 +806,18 @@ class CellLabelingApp {
         return true;
         
     }
-    
+
+    displayRegionBoundariesOnProjection() {
+        const shape = {
+            type: 'rect',
+            opacity: 1.0,
+            x0: this.region.x,
+            x1: this.region.x + this.region.width,
+            y0: this.region.y,
+            y1: this.region.y + this.region.height
+        }
+    }
+
     removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
         if (this.selected_roi !== null &&
            this.selected_roi.contour === null &&
@@ -821,8 +832,8 @@ class CellLabelingApp {
     }
 
     async updateShapesOnProjection() {
-        const contours = await this.toggleContoursOnProjection();
-        const points = this.displayROIPointsOnProjection();
+        const contours = await this.getRoiContourShapes();
+        const points = this.getRoiPointShapes();
 
         const shapes = [...contours, ...points];
         Plotly.relayout('projection', {'shapes': shapes});
