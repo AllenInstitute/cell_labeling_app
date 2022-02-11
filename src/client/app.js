@@ -25,7 +25,7 @@ class CellLabelingApp {
         });
 
         $('#projection_type').on('change', () => {
-            this.displayProjection();            
+            this.displayProjection();
         });
 
         $('#video_include_mask_outline').on('click', () => {
@@ -57,7 +57,11 @@ class CellLabelingApp {
         });
 
         $('#roi-display-video-and-trace').click(() => {
-            this.displayArtifacts({includeProjection: false, includeVideo: true, includeTrace: true});
+            this.displayArtifacts({
+                includeProjection: false,
+                includeVideo: true,
+                includeTrace: true
+            });
         });
 
         $('#notes').on('input', () => {
@@ -69,7 +73,7 @@ class CellLabelingApp {
         const projection = document.getElementById('projection');
 
         projection.on('plotly_click', data => {
-            const point  = data.points[0];
+            const point = data.points[0];
             const [y, x] = point.pointIndex;
             this.handleProjectionClick(x, y);
         });
@@ -89,7 +93,7 @@ class CellLabelingApp {
             }
             return region;
         });
-        
+
         if (region['region'] !== null) {
             const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.region));
             this.fovBounds = fovBounds;
@@ -164,35 +168,35 @@ class CellLabelingApp {
         rois = rois.filter(x => x.contours !== null);
 
         const paths = rois.map(obj => {
-                let instructions = obj.contours.map(contours => {
-                    return contours.map((coordinate, index) => {
-                        let instruction;
-                        const [x, y] = coordinate;
-                        if (index === 0) {
-                            instruction = `M ${x},${y}`;
-                        } else {
-                            instruction = `L${x},${y}`;
-                        }
+            let instructions = obj.contours.map(contours => {
+                return contours.map((coordinate, index) => {
+                    let instruction;
+                    const [x, y] = coordinate;
+                    if (index === 0) {
+                        instruction = `M ${x},${y}`;
+                    } else {
+                        instruction = `L${x},${y}`;
+                    }
 
-                        return instruction;
-                    });
+                    return instruction;
                 });
-                // Flatten multiple contours into single instruction set
-                instructions = _.flatten(instructions);
+            });
+            // Flatten multiple contours into single instruction set
+            instructions = _.flatten(instructions);
 
-                // Add the end instruction
-                instructions.push('Z');
-                return instructions;
+            // Add the end instruction
+            instructions.push('Z');
+            return instructions;
         });
         const pathStrings = paths.map(x => x.join(' '));
         const colors = rois.map(obj => {
             return obj.label === 'cell' ? [255, 0, 0] : obj.color;
         });
-        
+
         return _.zip(pathStrings, colors).map((obj, i) => {
             const [path, color] = obj;
             let line_width = 2;
-            if(this.selected_roi !== null && rois[i].id === this.selected_roi.id) {
+            if (this.selected_roi !== null && rois[i].id === this.selected_roi.id) {
                 line_width = 4;
             }
             return {
@@ -228,23 +232,23 @@ class CellLabelingApp {
         return fetch(url).then(async data => {
             const blob = await data.blob();
             data = await bytesToMatrix(blob);
-            
+
             data = data._data;
             this.projection_raw = data;
-            
+
             if (projection_type !== 'correlation') {
                 data = scaleToUint8(data);
             }
 
             data = toRGB(data);
-        
+
             const trace1 = {
                 z: data,
                 type: 'image',
                 // disable hover tooltip
                 hoverinfo: 'none'
             };
-        
+
             if (this.projection_is_shown) {
                 const layout = document.getElementById('projection').layout;
                 Plotly.react('projection', [trace1], layout);
@@ -276,10 +280,10 @@ class CellLabelingApp {
                 Plotly.newPlot('projection', [trace1], layout, config).then(() => {
                     this.projection_is_shown = true;
                 });
-                
+
                 this.addProjectionListeners();
             }
-            
+
             $('#projection_type').attr('disabled', false);
             $("#projection_include_mask_outline").attr("disabled", false);
             $('#projection_contrast').attr('disabled', false);
@@ -294,7 +298,7 @@ class CellLabelingApp {
             $('#projection-spinner').hide();
         });
     }
-    
+
     async displayVideo({videoTimeframe = null} = {}) {
         /* Renders video
         
@@ -308,7 +312,7 @@ class CellLabelingApp {
         // Disable contour toggle checkboxes until movie has loaded
         $('#video_include_mask_outline').attr("disabled", true);
         $('#video_include_surrounding_rois').attr('disabled', true);
-        
+
         // Reset timestep display text
         $('#timestep_display').text('');
 
@@ -319,8 +323,8 @@ class CellLabelingApp {
 
         if (videoTimeframe === null) {
             videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`)
-            .then(async data => await data.json())
-            .then(data => data['timeframe']);
+                .then(async data => await data.json())
+                .then(data => data['timeframe']);
         }
 
         videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
@@ -340,7 +344,7 @@ class CellLabelingApp {
         };
         return $.ajax({
             xhrFields: {
-               responseType: 'blob' 
+                responseType: 'blob'
             },
             type: 'POST',
             url: url,
@@ -379,7 +383,11 @@ class CellLabelingApp {
         this.displayVideo({videoTimeframe: timesteps});
     }
 
-    displayArtifacts({includeProjection = true, includeVideo = false, includeTrace = false} = {}) {
+    displayArtifacts({
+                         includeProjection = true,
+                         includeVideo = false,
+                         includeTrace = false
+                     } = {}) {
         const artifactLoaders = [];
         if (includeProjection) {
             artifactLoaders.push(this.displayProjection());
@@ -457,14 +465,17 @@ class CellLabelingApp {
         $('#loading_text').css('display', 'inline');
 
         const region = await this.getRandomRegionFromRandomExperiment()
-        .then(region => {
-            this.is_loading_new_region = false;
-            return region;
-        })
-        .catch(() => {
-            $('#loading_text').hide();
-            displayTemporaryAlert({msg: 'Error loading region', type: 'danger'});
-        });
+            .then(region => {
+                this.is_loading_new_region = false;
+                return region;
+            })
+            .catch(() => {
+                $('#loading_text').hide();
+                displayTemporaryAlert({
+                    msg: 'Error loading region',
+                    type: 'danger'
+                });
+            });
         if (region['region'] !== null) {
             return this.displayArtifacts().then(() => {
                 $('button#submit_labels').attr('disabled', false);
@@ -491,29 +502,38 @@ class CellLabelingApp {
                     .filter(x => x.contours !== null ||
                         (x.point !== null && x.label === 'cell'))
                     .map(x => {
-                    return {
-                        roi_id: x.id,
-                        is_segmented: x.contours !== null,
-                        point: x.point, 
-                        label: x.label
-                    }
-                }),
+                        return {
+                            roi_id: x.id,
+                            is_segmented: x.contours !== null,
+                            point: x.point,
+                            label: x.label
+                        }
+                    }),
             roi_extra
         };
         return $.post(url, JSON.stringify(data))
-        .then(() => {
-            displayTemporaryAlert({msg: 'Successfully submitted labels for region<br>Loading next region', type: 'success'});
-        })
-        .catch(() => {
-            displayTemporaryAlert({msg: 'Error submitting labels for region', type: 'danger'});
-            throw Error();
-        });
+            .then(() => {
+                displayTemporaryAlert({
+                    msg: 'Successfully submitted labels for region<br>Loading next region',
+                    type: 'success'
+                });
+            })
+            .catch(() => {
+                displayTemporaryAlert({
+                    msg: 'Error submitting labels for region',
+                    type: 'danger'
+                });
+                throw Error();
+            });
     }
 
     displayLoginMessage() {
         $.get('/users/getCurrentUser').then(data => {
             const username = data['user_id'];
-            displayTemporaryAlert({msg: `Logged in as ${username}`, type: 'info'});
+            displayTemporaryAlert({
+                msg: `Logged in as ${username}`,
+                type: 'info'
+            });
         });
     }
 
@@ -557,17 +577,18 @@ class CellLabelingApp {
             coordinates: [x, y]
         }
         postData = JSON.stringify(postData);
-        
-        
-        const res = await fetch(`http://localhost:${PORT}/find_roi_at_coordinates`, 
-            {   method: 'POST',
+
+
+        const res = await fetch(`http://localhost:${PORT}/find_roi_at_coordinates`,
+            {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: postData
             }).then(response => {
-                return response.json();
-            });
+            return response.json();
+        });
 
         if (res['roi_id'] === null) {
             await this.#handleNonSegmentedPointClick({x, y});
@@ -582,7 +603,7 @@ class CellLabelingApp {
 
         const cell_roi_ids = new Set(
             this.rois.filter(x => x.label === 'cell')
-            .map(x => x.id)
+                .map(x => x.id)
         );
 
         this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
@@ -603,7 +624,7 @@ class CellLabelingApp {
             // Select a new ROI
             this.selected_roi = selectedRoi;
         }
-        
+
         this.#updateSideNav();
 
         // Redraw the contours
@@ -638,36 +659,36 @@ class CellLabelingApp {
             const distance = Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
             return distance <= 4;
         }
-       const closePointIdx = this.rois
-           .findIndex(roi => roi.point !== null &&
-                      isClose(roi.point, [x, y]));
+        const closePointIdx = this.rois
+            .findIndex(roi => roi.point !== null &&
+                isClose(roi.point, [x, y]));
         let selectedRoi;
-       if (closePointIdx >= 0) {
-           // Clicking on a point that already exists
-           selectedRoi = this.rois[closePointIdx];
-           if (this.rois[closePointIdx].label === 'cell') {
-               this.rois[closePointIdx].label = 'not cell';
-               this.rois[closePointIdx].color = [255, 255, 255]
-           } else {
-               this.rois[closePointIdx].label = 'cell';
-               this.rois[closePointIdx].color = [255, 0, 0]
-           }
+        if (closePointIdx >= 0) {
+            // Clicking on a point that already exists
+            selectedRoi = this.rois[closePointIdx];
+            if (this.rois[closePointIdx].label === 'cell') {
+                this.rois[closePointIdx].label = 'not cell';
+                this.rois[closePointIdx].color = [255, 255, 255]
+            } else {
+                this.rois[closePointIdx].label = 'cell';
+                this.rois[closePointIdx].color = [255, 0, 0]
+            }
 
-       } else {
-           // Clicking on a new point
-           selectedRoi = new ROI({
-               id: `${x},${y}`,
-               experiment_id: this.experiment_id,
-               color: [255, 255, 255],
-               label: 'not cell',
-               point: [x, y]
-           });
-           this.rois.push(selectedRoi);
-       }
+        } else {
+            // Clicking on a new point
+            selectedRoi = new ROI({
+                id: `${x},${y}`,
+                experiment_id: this.experiment_id,
+                color: [255, 255, 255],
+                label: 'not cell',
+                point: [x, y]
+            });
+            this.rois.push(selectedRoi);
+        }
 
         this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
 
-       this.selected_roi = selectedRoi;
+        this.selected_roi = selectedRoi;
 
         this.resetSideNav();
         this.#updateSideNav();
@@ -675,7 +696,7 @@ class CellLabelingApp {
     }
 
     #updateSideNav() {
-        /* Updates the sidenav because a new point has been clicked */ 
+        /* Updates the sidenav because a new point has been clicked */
         const point = this.selected_roi.point;
         const roi_id = this.selected_roi.id;
         const isSegmented = this.selected_roi.contours !== null;
@@ -683,7 +704,7 @@ class CellLabelingApp {
         $('#roi-sidenav #this-roi').text(roiText);
         $('#roi-sidenav > *').attr('disabled', false);
         $('#roi-sidenav #notes').attr('disabled', false);
-        
+
         if (this.notes.has(roi_id)) {
             $('#notes').val(this.notes.get(roi_id));
         } else {
@@ -825,7 +846,7 @@ class CellLabelingApp {
         }
 
         return true;
-        
+
     }
 
     getRegionBoundariesShape() {
@@ -844,14 +865,14 @@ class CellLabelingApp {
 
     removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
         if (this.selected_roi !== null &&
-           this.selected_roi.contours === null &&
-           this.selected_roi.label === 'not cell' &&
-           this.selected_roi.id !== selectedRoi.id) {
-           // If we had an ROI selected and it is not a cell,
-           // and it is a nonsegmented point,
-           // and it is not the current roi,
-           // remove it
-           this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
+            this.selected_roi.contours === null &&
+            this.selected_roi.label === 'not cell' &&
+            this.selected_roi.id !== selectedRoi.id) {
+            // If we had an ROI selected and it is not a cell,
+            // and it is a nonsegmented point,
+            // and it is not the current roi,
+            // remove it
+            this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
         }
     }
 
@@ -864,7 +885,7 @@ class CellLabelingApp {
     }
 }
 
-$( document ).ready(async function() {
+$(document).ready(async function () {
     const app = new CellLabelingApp();
     app.loadNewRegion();
 });
