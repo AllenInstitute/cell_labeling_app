@@ -2,7 +2,7 @@ import base64
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional, List
 
 import cv2
 import h5py
@@ -154,7 +154,7 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
     :param reshape_contours_to_list:
     :return:
         dict with keys
-            - contour: list of contour x, y coordinates
+            - contours: list of contour x, y coordinates
             - color: color of contour
             - id: roi id
             - experiment_id: experiment id
@@ -184,31 +184,38 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
                                        cv2.CHAIN_APPROX_NONE)
         if reshape_contours_to_list:
             contours = [
-                x.reshape(x.shape[0], 2).tolist() for x in contours
+                contour.reshape(contour.shape[0], 2).tolist()
+                for contour in contours
             ]
 
         color = get_soft_filter_roi_color(
             classifier_score=roi['classifier_score'])
-        for contour in contours:
-            all_contours.append({
-                'contour': contour,
-                'color': color,
-                'id': id,
-                'classifier_score': classifier_score,
-                'box_x': x,
-                'box_y': y,
-                'box_width': width,
-                'box_height': height,
-                'experiment_id': experiment_id
-            })
+        all_contours.append({
+            'contours': contours,
+            'color': color,
+            'id': id,
+            'classifier_score': classifier_score,
+            'box_x': x,
+            'box_y': y,
+            'box_width': width,
+            'box_height': height,
+            'experiment_id': experiment_id
+        })
     return all_contours
 
 
-def get_trace(experiment_id: str, roi_id: str):
+def get_trace(experiment_id: str, roi_id: str, point: Optional[List] = None):
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    with h5py.File(artifact_path, 'r') as f:
-        trace = (f['traces'][roi_id][()])
+    if point is None:
+        # retrieve precomputed trace
+        with h5py.File(artifact_path, 'r') as f:
+            trace = (f['traces'][roi_id][()])
+    else:
+        # Pull the trace from the video for the point
+        x, y = point
+        with h5py.File(artifact_path, 'r') as f:
+            trace = (f['video_data'][:][:, y, x])
     return trace
 
 
