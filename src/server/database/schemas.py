@@ -2,7 +2,7 @@ import datetime
 
 from flask_login import UserMixin
 
-from src.server.database.database import db
+from server.database.database import db
 
 
 class LabelingJob(db.Model):

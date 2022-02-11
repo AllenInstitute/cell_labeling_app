@@ -8,9 +8,9 @@ import numpy as np
 from flask import Flask
 from sqlalchemy import desc
 
-from src.server.database.database import db
-from src.server.database.schemas import LabelingJob, JobRegion
-from src.server.main import create_app
+from server.database.database import db
+from server.database.schemas import LabelingJob, JobRegion
+from server.main import create_app
 
 FIELD_OF_VIEW_DIMENSIONS = (512, 512)
 

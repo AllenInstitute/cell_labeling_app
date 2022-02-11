@@ -12,7 +12,7 @@ import pandas as pd
 from PIL import Image
 from flask import current_app
 
-from src.server.database.schemas import JobRegion
+from server.database.schemas import JobRegion
 
 
 def _is_roi_within_region(roi: Dict, region: JobRegion,

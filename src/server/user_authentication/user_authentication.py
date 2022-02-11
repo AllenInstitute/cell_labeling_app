@@ -1,6 +1,6 @@
 from flask_login import LoginManager
 
-from src.server.database.schemas import User
+from server.database.schemas import User
 
 login = LoginManager()
 
