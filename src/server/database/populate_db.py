@@ -2,9 +2,10 @@ import argparse
 import os
 import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
+import pandas as pd
 from flask import Flask
 from sqlalchemy import desc
 
@@ -17,15 +18,26 @@ FIELD_OF_VIEW_DIMENSIONS = (512, 512)
 
 class Region:
     """A region in a field of view"""
-    def __init__(self, x: int, y: int):
+
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 experiment_id: str):
         """
         :param x:
             Region upper left x value in fov coordinates
         :param y:
             Region upper left y value in fov coordinates
+        :param width
+            Region width
+        :param height
+            region height
+        :param
+            The experiment id the region belongs to
         """
         self._x = x
         self._y = y
+        self._width = width
+        self._height = height
+        self._experiment_id = experiment_id
 
     @property
     def x(self) -> int:
@@ -34,6 +46,18 @@ class Region:
     @property
     def y(self) -> int:
         return self._y
+
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @property
+    def height(self) -> int:
+        return self._height
+
+    @property
+    def experiment_id(self) -> str:
+        return self._experiment_id
 
 
 def _get_all_experiments(artifact_dir: Path) -> List[str]:
@@ -53,55 +77,110 @@ def _get_all_experiments(artifact_dir: Path) -> List[str]:
     return res
 
 
-def _get_all_regions(
-        region_dimensions: Tuple[int, int],
-        border_offset: int) -> List[Region]:
+def _get_motion_border_for_experiment(
+        experiment_id: str,
+        motion_correction_path: Path) -> Tuple[int, int]:
+    """Gets the motion border for an experiment
+
+    :return
+        motion border x, y values
+    """
+    registration_output = motion_correction_path / f'{experiment_id}' / \
+        f'{experiment_id}_rigid_motion_transform.csv'
+    df = pd.read_csv(registration_output)
+    border_x = df['x'].abs().max()
+    border_y = df['y'].abs().max()
+    return border_x, border_y
+
+
+def _get_all_regions_for_experiment(
+        experiment_id: str,
+        motion_correction_path: Path,
+        exclude_motion_border=True,
+        fov_divisor=4
+) -> List[Region]:
     """Gets list of all possible regions in a field of view
-    by evenly dividing the field of view into equally spaced regions
-    :param region_dimensions:
-        Region dimensions (width x height)
-    :param border_offset
-        Offset to apply so that regions are only sampled this distance away
-        from the border
+    by dividing the field of view into equally spaced regions
+
+    :param experiment_id
+        Experiment id
+    :param motion_correction_path
+        Path to motion correction output
+    :param exclude_motion_border
+        Whether to exclude the motion border when sampling regions
+    :param fov_divisor
+        The number of times to divide a field of view to get the region
+        dimensions. Ie if the field of view is 512x512, and region_divisor is
+        4, the regions will be of size 128x128.
     """
     res = []
     fov_width, fov_height = FIELD_OF_VIEW_DIMENSIONS
-    region_width, region_height = region_dimensions
 
-    for y in range(border_offset, fov_height - border_offset, region_height):
-        for x in range(border_offset, fov_width - border_offset, region_width):
-            region = Region(x=x, y=y)
+    if exclude_motion_border:
+        border_offset_x, border_offset_y = _get_motion_border_for_experiment(
+            experiment_id=experiment_id,
+            motion_correction_path=motion_correction_path)
+    else:
+        border_offset_x, border_offset_y = 0, 0
+
+    fov_width -= border_offset_x * 2  # subtracting off both sides
+    fov_height -= border_offset_y * 2  # subtracting off both sides
+
+    region_width, region_height = (int(fov_width / fov_divisor),
+                                   int(fov_height / fov_divisor))
+
+    for y in range(border_offset_y, fov_height - border_offset_y,
+                   region_height):
+        for x in range(border_offset_x, fov_width - border_offset_x,
+                       region_width):
+            region = Region(x=x,
+                            y=y,
+                            width=region_width,
+                            height=region_height,
+                            experiment_id=experiment_id)
             res.append(region)
     return res
 
 
-def _get_all_experiment_regions(
+def _get_all_regions(
         artifact_dir: Path,
-        region_dimensions: Tuple[int, int],
-        border_offset: int) -> List[str]:
+        motion_correction_path: Path,
+        exclude_motion_border=True,
+        fov_divisor=4
+) -> List[Region]:
     """Returns list of all experiment-region combinations in string form
     :param artifact_dir:
         Path to artifact hdf5 files
-    :param region_dimensions:
-        Region dimensions (width x height)
-    :param border_offset
-        Offset to apply so that regions are only sampled this distance away
-        from the border
+    :param motion_correction_path
+        Path to motion correction output
+    :param exclude_motion_border
+        Whether to exclude the motion border when sampling regions
+    :param
+        See `fov_divisor` in `_get_all_regions_for_experiment`
     """
     experiments = _get_all_experiments(artifact_dir=artifact_dir)
-    regions = _get_all_regions(region_dimensions=region_dimensions,
-                               border_offset=border_offset)
 
     res = []
     for experiment in experiments:
+        regions = _get_all_regions_for_experiment(
+            experiment_id=experiment,
+            motion_correction_path=motion_correction_path,
+            fov_divisor=fov_divisor,
+            exclude_motion_border=exclude_motion_border
+        )
         for region in regions:
-            res.append(f'{experiment}_{region.x}_{region.y}')
+            res.append(region)
     return res
 
 
-def populate_labeling_job(app: Flask, db, n: int,
-                          region_dimensions: Tuple[int, int],
-                          border_offset: int):
+def populate_labeling_job(
+    app: Flask,
+    db,
+    n: int,
+    motion_correction_path: Optional[Path],
+    exclude_motion_border=True,
+    fov_divisor=4
+):
     """
     Creates a new labeling job by randomly sampling n total regions from all
     available experiments
@@ -111,36 +190,41 @@ def populate_labeling_job(app: Flask, db, n: int,
         The database
     :param n:
         Number of regions in this job
-    :param region_dimensions:
-        Size (width x height) of each region to sample
-    :param border_offset
-        Offset to apply so that regions are only sampled this distance away
-        from the border
+    :param motion_correction_path
+        Motion correction path. Required if exclude_motion_border is True.
+    :param exclude_motion_border
+        Whether to exclude the motion border when sampling regions
+    :param fov_divisor
+        The number of times to divide a field of view to get the region
+        dimensions. Ie if the field of view is 512x512, and region_divisor is
+        4, the regions will be of size 128x128.
     :return:
         None. Inserts records into the DB
     """
-    region_width, region_height = region_dimensions
-
+    if exclude_motion_border and motion_correction_path is None:
+        raise ValueError('motion_correction_path required if '
+                         'exclude_motion_border is True')
     job = LabelingJob()
     db.session.add(job)
 
-    all_experiments_and_regions = _get_all_experiment_regions(
+    all_regions = _get_all_regions(
         artifact_dir=Path(app.config['ARTIFACT_DIR']),
-        region_dimensions=region_dimensions, border_offset=border_offset)
+        exclude_motion_border=exclude_motion_border,
+        motion_correction_path=motion_correction_path,
+        fov_divisor=fov_divisor
+    )
 
-    regions = np.random.choice(all_experiments_and_regions, size=n,
-                               replace=False)
+    regions: List[Region] = \
+        np.random.choice(all_regions, size=n, replace=False)
 
     job_id = db.session.query(LabelingJob.job_id).order_by(desc(
         LabelingJob.date)).first()[0]
 
     for region in regions:
-        experiment_id, region_x, region_y = region.split('_')
-        region_x = int(region_x)
-        region_y = int(region_y)
-        job_region = JobRegion(job_id=job_id, experiment_id=experiment_id,
-                               x=region_x, y=region_y, width=region_width,
-                               height=region_height)
+        job_region = JobRegion(job_id=job_id,
+                               experiment_id=region.experiment_id,
+                               x=region.x, y=region.y, width=region.width,
+                               height=region.height)
         db.session.add(job_region)
 
     db.session.commit()
@@ -157,36 +241,41 @@ if __name__ == '__main__':
         parser.add_argument('--n', required=True,
                             help='Number of regions to include in the '
                                  'labeling job')
-        parser.add_argument('--region_width', required=True,
-                            help='Region width', type=int)
-        parser.add_argument('--region_height', required=True,
-                            help='Region height', type=int)
-        parser.add_argument('--border_offset', default=0, type=int,
-                            help='Offset to apply so that regions are only '
-                                 'sampled this distance away from the border')
+        parser.add_argument('--fov_divisor',
+                            help='Amount by which the field of view '
+                                 'is divided to obtain the region '
+                                 'dimensions. Ie if the field of view is '
+                                 '512x512 and fov_divisor is 4, this will '
+                                 'divide each dimension by 4 to yield regions '
+                                 'of size 128x128. If exclude_motion_border '
+                                 'is True, then region divisor will divide '
+                                 'up the area within the motion border.',
+                            type=int, default=4)
+        parser.add_argument('--exclude_motion_border', action='store_true',
+                            default=True,
+                            help='Whether to exclude the motion border when '
+                                 'sampling regions')
+        parser.add_argument('--motion_correction_path', required=False,
+                            help='Path to motion correction output. Used for '
+                                 'sampling within motion border. Required if '
+                                 'exclude_motion_border is True')
         args = parser.parse_args()
         n = int(args.n)
 
-        fov_width, fov_height = FIELD_OF_VIEW_DIMENSIONS
-        if fov_width % args.region_width != 0:
-            raise ValueError(f'Region width {args.region_width} not evenly '
-                             f'divisible with field of view width {fov_width}')
-        if fov_height % args.region_height != 0:
-            raise ValueError(f'Region height {args.region_height} not evenly '
-                             f'divisible with field of view width '
-                             f'{fov_height}')
-
-        region_dimension = (args.region_width, args.region_height)
         config_path = Path(args.config_path)
+        motion_correction_path = Path(args.motion_correction_path) if \
+            args.motion_correction_path else None
 
         app = create_app(config_file=config_path)
         if not Path(app.config['SQLALCHEMY_DATABASE_URI']
-                    .replace('sqlite:///', '')).is_file():
+                            .replace('sqlite:///', '')).is_file():
             with app.app_context():
                 db.create_all()
         app.app_context().push()
         populate_labeling_job(app=app, db=db, n=n,
-                              region_dimensions=region_dimension,
-                              border_offset=args.border_offset)
+                              exclude_motion_border=args.exclude_motion_border,
+                              motion_correction_path=motion_correction_path,
+                              fov_divisor=args.fov_divisor)
+
 
     main()
