@@ -183,8 +183,7 @@ class RegionSampler:
 
 def populate_labeling_job(regions: List[Region]):
     """
-    Creates a new labeling job by randomly sampling n total regions from all
-    available experiments
+    Creates a new labeling job
     :param regions
         List of regions to add to the labeling job
     :return:
