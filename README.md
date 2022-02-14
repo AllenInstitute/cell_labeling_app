@@ -22,7 +22,7 @@ You will need a config file (.py) to run the app. It currently requires the foll
 | SQLALCHEMY_DATABASE_URI | Path to app database (will get created if does not already exist) |
 | ARTIFACT_DIR            | Path to artifacts (videos, projections, etc) (as hdf5 files)      |
 
-If you have not already created and populated your `SQLALCHEMY_DATABASE`, execute `python src/server/database/populate_db.py` to populate your database of labeling jobs.
+If you have not already created and populated your `SQLALCHEMY_DATABASE`, execute `python src/server/database/populate_labeling_job.py` to populate your database of labeling jobs.
 
 Execute `python src/server/main.py` to start the web server.
 
