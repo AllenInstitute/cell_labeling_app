@@ -10,3 +10,4 @@ Flask-Login
 waitress~=2.0.0
 SQLAlchemy~=1.4.26
 pytest~=6.2.5
+git+https://github.com/AllenInstitute/ophys_etl_pipelines@main
