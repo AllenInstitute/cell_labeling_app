@@ -162,15 +162,19 @@ class RegionSampler:
         else:
             border_offset_x, border_offset_y = 0, 0
 
-        fov_width -= border_offset_x * 2  # subtracting off both sides
-        fov_height -= border_offset_y * 2  # subtracting off both sides
+        within_border_fov_width = fov_width - border_offset_x * 2
+        within_border_fov_height = fov_height - border_offset_y * 2
 
-        region_width, region_height = (int(fov_width / fov_divisor),
-                                       int(fov_height / fov_divisor))
+        region_width, region_height = (int(within_border_fov_width /
+                                           fov_divisor),
+                                       int(within_border_fov_height /
+                                           fov_divisor))
 
-        for y in range(border_offset_y, fov_height - border_offset_y,
+        for y in range(border_offset_y,
+                       fov_height - border_offset_y,
                        region_height):
-            for x in range(border_offset_x, fov_width - border_offset_x,
+            for x in range(border_offset_x,
+                           fov_width - border_offset_x,
                            region_width):
                 region = Region(x=x,
                                 y=y,
