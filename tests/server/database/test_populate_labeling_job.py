@@ -46,6 +46,7 @@ class TestPopulateLabelingJob:
         config = f'''
 SQLALCHEMY_DATABASE_URI = f'sqlite:///{self.db_fp.name}'
 SESSION_SECRET_KEY = 1
+SQLALCHEMY_TRACK_MODIFICATIONS = False
         '''
         self.config_fp.write(config)
         self.config_fp.seek(0)
