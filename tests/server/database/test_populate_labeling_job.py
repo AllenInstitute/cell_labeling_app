@@ -14,6 +14,7 @@ from server.database.populate_labeling_job import RegionSampler, \
 
 
 class TestPopulateLabelingJob:
+    """Tests region sampling and job creation"""
     def setup_class(self):
         self.motion_correction_path = tempfile.TemporaryDirectory()
         self.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
@@ -57,6 +58,7 @@ SESSION_SECRET_KEY = 1
     @pytest.mark.parametrize('fov_divisor', (1, 2, 4))
     @pytest.mark.parametrize('exclude_motion_border', (True, False))
     def test_sampler(self, fov_divisor, exclude_motion_border):
+        """tests that sampled regions are as expected"""
         sampler = RegionSampler(num_regions=1, fov_divisor=fov_divisor)
         regions = sampler.sample(
             experiment_ids=['1'],
@@ -79,6 +81,7 @@ SESSION_SECRET_KEY = 1
     @pytest.mark.parametrize('fov_divisor', (4,))
     def test_create_labeling_job(self, num_regions, exclude_motion_border,
                                  fov_divisor):
+        """tests that region entries populated in db are as expected"""
         sampler = RegionSampler(num_regions=num_regions,
                                 fov_divisor=fov_divisor)
         regions = sampler.sample(
