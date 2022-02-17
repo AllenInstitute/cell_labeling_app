@@ -65,9 +65,11 @@ class Region:
 class RegionSampler:
     """A class to sample regions from a field of view"""
     def __init__(
-            self,
-            num_regions: int,
-            fov_divisor=4):
+        self,
+        num_regions: int,
+        fov_divisor=4,
+        seed=None
+    ):
         """
         :param num_regions:
             Number of regions to sample
@@ -75,9 +77,12 @@ class RegionSampler:
             The number of times to divide a field of view to get the region
             dimensions. Ie if the field of view is 512x512, and region_divisor
             is 4, the regions will be of size 128x128.
+        :param seed:
+            Seed for reproducibility
         """
         self._num_regions = num_regions
         self._fov_divisor = fov_divisor
+        self._seed = seed
 
     def sample(self,
                experiment_ids: List[str],
@@ -109,9 +114,10 @@ class RegionSampler:
             for region in regions:
                 all_regions.append(region)
 
+        rng = np.random.default_rng(seed=self._seed)
         regions: List[Region] = \
-            np.random.choice(all_regions, size=self._num_regions,
-                             replace=False)
+            rng.choice(all_regions, size=self._num_regions,
+                       replace=False)
         return regions
 
     @staticmethod
