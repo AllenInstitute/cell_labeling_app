@@ -8,6 +8,43 @@ import h5py
 import numpy as np
 
 
+class _MotionBorder:
+    """Motion border"""
+
+    def __init__(self, left_side: int, right_side: int, top: int, bottom: int):
+        """
+
+        :param left_side:
+            left side of motion border
+        :param right_side:
+            right side of motion border
+        :param top:
+            top of motion border
+        :param bottom:
+            bottom of motion border
+        """
+        self._left_side = left_side
+        self._right_side = right_side
+        self._top = top
+        self._bottom = bottom
+
+    @property
+    def left_side(self):
+        return self._left_side
+
+    @property
+    def right_side(self):
+        return self._right_side
+
+    @property
+    def top(self):
+        return self._top
+
+    @property
+    def bottom(self):
+        return self._bottom
+
+
 class ArtifactFile:
     """Class for reading artifacts from hdf5 file"""
     def __init__(self, path: Union[Path, str]):
@@ -28,9 +65,14 @@ class ArtifactFile:
             return json.loads((f['rois'][()]))
     
     @property
-    def motion_border(self):
+    def motion_border(self) -> _MotionBorder:
         with h5py.File(self._path, 'r') as f:
-            return json.loads(f['motion_border'][()])
+            mb = json.loads(f['motion_border'][()])
+            mb = _MotionBorder(left_side=mb['left_side'],
+                               right_side=mb['right_side'],
+                               top=mb['top'],
+                               bottom=mb['bottom'])
+            return mb
 
     def get_projection(self, projection_type: str) -> np.ndarray:
         with h5py.File(self._path, 'r') as f:
