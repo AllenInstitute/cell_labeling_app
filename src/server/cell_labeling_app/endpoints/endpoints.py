@@ -140,6 +140,20 @@ def get_trace():
     }
 
 
+@api.route('/get_motion_border')
+def get_motion_border():
+    experiment_id = request.args['experiment_id']
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
+    af = ArtifactFile(path=artifact_path)
+    mb = af.motion_border
+    return {
+        'left_side': mb.left_side,
+        'right_side': mb.right_side,
+        'top': mb.top,
+        'bottom': mb.bottom
+    }
+
+
 @api.route('/get_video', methods=['POST'])
 def get_video():
     request_data = request.get_json(force=True)
