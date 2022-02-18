@@ -267,6 +267,14 @@ def get_fov_bounds():
     }
 
 
+@api.route('/get_field_of_view_dimensions')
+def get_field_of_view_dimensions():
+    dims = current_app.config['FIELD_OF_VIEW_DIMENSIONS']
+    return {
+        'field_of_view_dimensions': dims
+    }
+
+
 @api.route('/submit_region', methods=['POST'])
 def submit_region():
     """Inserts records for labels and additional user-submitted roi metadata"""
