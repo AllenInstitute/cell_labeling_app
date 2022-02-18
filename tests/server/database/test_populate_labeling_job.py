@@ -1,10 +1,11 @@
+import json
 import os
 import shutil
 import tempfile
 from pathlib import Path
 from typing import List
 
-import pandas as pd
+import h5py
 import pytest
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import JobRegion
@@ -16,7 +17,7 @@ from cell_labeling_app.database.populate_labeling_job import RegionSampler, \
 class TestPopulateLabelingJob:
     """Tests region sampling and job creation"""
     def setup_class(self):
-        self.motion_correction_path = tempfile.TemporaryDirectory()
+        self.artifacts_path = tempfile.TemporaryDirectory()
         self.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
         self.config_fp = tempfile.NamedTemporaryFile('w', suffix='.py')
 
@@ -24,20 +25,21 @@ class TestPopulateLabelingJob:
         self.motion_border_y = 20
 
         for exp_id in (1,):
-            exp_id_path = Path(self.motion_correction_path.name) / f'{exp_id}'
-            os.makedirs(exp_id_path)
-            with open(exp_id_path / f'{exp_id}_rigid_motion_transform.csv',
-                      'w') as f:
-                pd.DataFrame({
-                    'frame': [0, 1],
-                    'x': [0, self.motion_border_x],
-                    'y': [0, -self.motion_border_y]
-                }).to_csv(f)
+            exp_id_path = Path(self.artifacts_path.name)
+            with h5py.File(exp_id_path / f'{exp_id}_artifacts.h5', 'w') as f:
+                mb = {
+                    'top': self.motion_border_y,
+                    'right_side': self.motion_border_x,
+                    'bottom': self.motion_border_y,
+                    'left_side': self.motion_border_x
+                }
+                mb = json.dumps(mb)
+                f.create_dataset('motion_border', data=mb)
 
     def teardown_class(self):
         self.config_fp.close()
         self.db_fp.close()
-        shutil.rmtree(self.motion_correction_path.name)
+        shutil.rmtree(self.artifacts_path.name)
 
     def setup_method(self, method):
         self.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
@@ -60,10 +62,9 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
     @pytest.mark.parametrize('exclude_motion_border', (True, False))
     def test_sampler(self, fov_divisor, exclude_motion_border):
         """tests that sampled regions are as expected"""
-        sampler = RegionSampler(num_regions=1, fov_divisor=fov_divisor)
+        sampler = RegionSampler(num_regions=1, fov_divisor=fov_divisor,
+                                artifact_path=self.artifacts_path.name)
         regions = sampler.sample(
-            experiment_ids=['1'],
-            motion_correction_path=Path(self.motion_correction_path.name),
             exclude_motion_border=exclude_motion_border
         )
         if exclude_motion_border:
@@ -84,10 +85,9 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
                                  fov_divisor):
         """tests that region entries populated in db are as expected"""
         sampler = RegionSampler(num_regions=num_regions,
-                                fov_divisor=fov_divisor)
+                                fov_divisor=fov_divisor,
+                                artifact_path=self.artifacts_path.name)
         regions = sampler.sample(
-            experiment_ids=['1'],
-            motion_correction_path=Path(self.motion_correction_path.name),
             exclude_motion_border=exclude_motion_border
         )
         populate_labeling_job(regions=regions)

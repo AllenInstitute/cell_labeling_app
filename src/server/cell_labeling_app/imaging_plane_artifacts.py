@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 
 
-class _MotionBorder:
+class MotionBorder:
     """Motion border"""
 
     def __init__(self, left_side: int, right_side: int, top: int, bottom: int):
@@ -55,6 +55,10 @@ class ArtifactFile:
         self._path = path
 
     @property
+    def experiment_id(self):
+        return self._path.name.split('_')[0]
+
+    @property
     def video(self) -> np.ndarray:
         with h5py.File(self._path, 'r') as f:
             return f['video_data'][()]
@@ -65,13 +69,13 @@ class ArtifactFile:
             return json.loads((f['rois'][()]))
     
     @property
-    def motion_border(self) -> _MotionBorder:
+    def motion_border(self) -> MotionBorder:
         with h5py.File(self._path, 'r') as f:
             mb = json.loads(f['motion_border'][()])
-            mb = _MotionBorder(left_side=mb['left_side'],
-                               right_side=mb['right_side'],
-                               top=mb['top'],
-                               bottom=mb['bottom'])
+            mb = MotionBorder(left_side=mb['left_side'],
+                              right_side=mb['right_side'],
+                              top=mb['top'],
+                              bottom=mb['bottom'])
         return mb
 
     def get_projection(self, projection_type: str) -> np.ndarray:
