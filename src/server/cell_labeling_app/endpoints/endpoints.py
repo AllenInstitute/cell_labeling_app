@@ -6,19 +6,18 @@ from typing import List
 import cv2
 import numpy as np
 from PIL import Image
-from flask import render_template, request, send_file, Blueprint, current_app, \
-    Request
+from flask import render_template, request, send_file, Blueprint, \
+    current_app, Request
 from flask_login import current_user
 from ophys_etl.utils.thumbnail_video_generator import VideoGenerator
 from sqlalchemy import desc
 
-from server.database.database import db
-from server.database.schemas import LabelingJob, JobRegion, UserLabels, \
-    UserRoiExtra
-from server.util import util
-from server.util.util import get_artifacts_path
-
-from src.server.artifact import ArtifactFile
+from cell_labeling_app.database.database import db
+from cell_labeling_app.database.schemas import LabelingJob, JobRegion, \
+    UserLabels, UserRoiExtra
+from cell_labeling_app.util import util
+from cell_labeling_app.util.util import get_artifacts_path
+from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 
 api = Blueprint(name='api', import_name=__name__)
 

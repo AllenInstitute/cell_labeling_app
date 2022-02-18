@@ -10,9 +10,8 @@ import pandas as pd
 from PIL import Image
 from flask import current_app
 
-from server.database.schemas import JobRegion
-
-from src.server.artifact import ArtifactFile
+from cell_labeling_app.database.schemas import JobRegion
+from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 
 
 def _is_roi_within_region(roi: Dict, region: JobRegion,

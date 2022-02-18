@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import desc
 
-from server.database.database import db
-from server.database.schemas import LabelingJob, JobRegion
-from server.main import create_app
+from cell_labeling_app.database.database import db
+from cell_labeling_app.database.schemas import LabelingJob, JobRegion
+from cell_labeling_app.main import create_app
 
 FIELD_OF_VIEW_DIMENSIONS = (512, 512)
 

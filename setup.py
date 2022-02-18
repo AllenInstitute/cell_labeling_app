@@ -6,6 +6,6 @@ setup(
       author="Adam Amster",
       author_email="adam.amster@alleninstitute.org",
       url="https://github.com/AllenInstitute/cell_labeling_app",
-      package_dir={"": "src"},
-      packages=find_packages(where="src")
+      package_dir={"": "src/server"},
+      packages=find_packages(where="src/server")
 )

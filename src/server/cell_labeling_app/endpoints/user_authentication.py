@@ -2,8 +2,8 @@ from flask import Blueprint, request, redirect, url_for, render_template, \
     current_app
 from flask_login import login_user, current_user
 
-from server.database.database import db
-from server.database.schemas import User
+from cell_labeling_app.database.database import db
+from cell_labeling_app.database.schemas import User
 
 users = Blueprint(name='users', import_name=__name__, url_prefix='/users')
 

@@ -1,6 +1,6 @@
 from flask_login import LoginManager
 
-from server.database.schemas import User
+from cell_labeling_app.database.schemas import User
 
 login = LoginManager()
 

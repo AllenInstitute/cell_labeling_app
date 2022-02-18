@@ -72,7 +72,7 @@ class ArtifactFile:
                                right_side=mb['right_side'],
                                top=mb['top'],
                                bottom=mb['bottom'])
-            return mb
+        return mb
 
     def get_projection(self, projection_type: str) -> np.ndarray:
         with h5py.File(self._path, 'r') as f:

@@ -6,10 +6,10 @@ from typing import List
 
 import pandas as pd
 import pytest
-from server.database.database import db
-from server.database.schemas import JobRegion
-from server.main import create_app
-from server.database.populate_labeling_job import RegionSampler, \
+from cell_labeling_app.database.database import db
+from cell_labeling_app.database.schemas import JobRegion
+from cell_labeling_app.main import create_app
+from cell_labeling_app.database.populate_labeling_job import RegionSampler, \
     FIELD_OF_VIEW_DIMENSIONS, populate_labeling_job, Region
 
 
