@@ -16,7 +16,7 @@ def create_app(config_file: Path, port=5000):
         raise ValueError('Config file must be a python module ending in '
                            '".py"')
 
-    template_dir = (Path(__file__).parent.parent / 'client').resolve()
+    template_dir = (Path(__file__).parent.parent.parent / 'client').resolve()
     static_dir = template_dir
     app = Flask(__name__, static_folder=static_dir,
                           template_folder=str(template_dir))
