@@ -1,3 +1,5 @@
+"""Module for retrieving imaging plane data"""
+
 import json
 from pathlib import Path
 from typing import Union, List, Optional
@@ -24,6 +26,11 @@ class ArtifactFile:
     def rois(self) -> List[dict]:
         with h5py.File(self._path, 'r') as f:
             return json.loads((f['rois'][()]))
+    
+    @property
+    def motion_border(self):
+        with h5py.File(self._path, 'r') as f:
+            return json.loads(f['motion_border'][()])
 
     def get_projection(self, projection_type: str) -> np.ndarray:
         with h5py.File(self._path, 'r') as f:
