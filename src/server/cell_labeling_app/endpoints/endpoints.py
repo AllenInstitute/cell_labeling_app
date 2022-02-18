@@ -1,23 +1,23 @@
 import json
 import random
 from io import BytesIO
-from typing import List, Tuple
+from typing import List
 
 import cv2
-import h5py
 import numpy as np
 from PIL import Image
-from flask import render_template, request, send_file, Blueprint, current_app, \
-    Request
+from flask import render_template, request, send_file, Blueprint, \
+    current_app, Request
 from flask_login import current_user
 from ophys_etl.utils.thumbnail_video_generator import VideoGenerator
 from sqlalchemy import desc
 
-from server.database.database import db
-from server.database.schemas import LabelingJob, JobRegion, UserLabels, \
-    UserRoiExtra
-from server.util import util
-from server.util.util import get_artifacts_path
+from cell_labeling_app.database.database import db
+from cell_labeling_app.database.schemas import LabelingJob, JobRegion, \
+    UserLabels, UserRoiExtra
+from cell_labeling_app.util import util
+from cell_labeling_app.util.util import get_artifacts_path
+from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 
 api = Blueprint(name='api', import_name=__name__)
 
@@ -111,20 +111,11 @@ def get_projection():
 
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    with h5py.File(artifact_path, 'r') as f:
-        if projection_type == 'max':
-            dataset_name = 'max_projection'
-        elif projection_type == 'average':
-            dataset_name = 'avg_projection'
-        elif projection_type == 'correlation':
-            dataset_name = 'correlation_projection'
-        else:
-            return 'bad projection type', 400
-        projection = f[dataset_name][:]
-
-    if len(projection.shape) == 3:
-        projection = projection[:, :, 0]
-    projection = projection.astype('uint16')
+    af = ArtifactFile(path=artifact_path)
+    try:
+        projection = af.get_projection(projection_type=projection_type)
+    except ValueError as e:
+        return e, 400
 
     image = Image.fromarray(projection)
     image = image.tobytes()
@@ -146,6 +137,20 @@ def get_trace():
     trace = trace.tolist()
     return {
         'trace': trace
+    }
+
+
+@api.route('/get_motion_border')
+def get_motion_border():
+    experiment_id = request.args['experiment_id']
+    artifact_path = get_artifacts_path(experiment_id=experiment_id)
+    af = ArtifactFile(path=artifact_path)
+    mb = af.motion_border
+    return {
+        'left_side': mb.left_side,
+        'right_side': mb.right_side,
+        'top': mb.top,
+        'bottom': mb.bottom
     }
 
 
@@ -171,8 +176,8 @@ def get_video():
 
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    with h5py.File(artifact_path, 'r') as f:
-        video_generator = VideoGenerator(video_data=f['video_data'][()])
+    af = ArtifactFile(path=artifact_path)
+    video_generator = VideoGenerator(video_data=af.video)
 
     region = (db.session.query(JobRegion)
               .filter(JobRegion.id == region_id)
@@ -262,6 +267,14 @@ def get_fov_bounds():
     }
 
 
+@api.route('/get_field_of_view_dimensions')
+def get_field_of_view_dimensions():
+    dims = current_app.config['FIELD_OF_VIEW_DIMENSIONS']
+    return {
+        'field_of_view_dimensions': dims
+    }
+
+
 @api.route('/submit_region', methods=['POST'])
 def submit_region():
     """Inserts records for labels and additional user-submitted roi metadata"""
@@ -313,8 +326,8 @@ def find_roi_at_coordinates():
               .first())
 
     artifact_path = get_artifacts_path(experiment_id=region.experiment_id)
-    with h5py.File(artifact_path, 'r') as f:
-        rois = json.loads((f['rois'][()]))
+    af = ArtifactFile(path=artifact_path)
+    rois = af.rois
 
     # 1) First limit candidate rois to rois in region
     rois = [x for x in rois if x['id'] in rois_in_region]

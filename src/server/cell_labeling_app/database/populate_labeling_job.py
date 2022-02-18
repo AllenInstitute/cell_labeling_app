@@ -2,15 +2,17 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Union
 
 import numpy as np
-import pandas as pd
+from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from sqlalchemy import desc
 
-from server.database.database import db
-from server.database.schemas import LabelingJob, JobRegion
-from server.main import create_app
+from cell_labeling_app.database.database import db
+from cell_labeling_app.database.schemas import LabelingJob, JobRegion
+from cell_labeling_app.main import create_app
+
+from cell_labeling_app.imaging_plane_artifacts import MotionBorder
 
 FIELD_OF_VIEW_DIMENSIONS = (512, 512)
 
@@ -66,11 +68,15 @@ class RegionSampler:
     """A class to sample regions from a field of view"""
     def __init__(
         self,
+        artifact_path: Union[str, Path],
         num_regions: int,
         fov_divisor=4,
         seed=None
     ):
         """
+        :param artifact_path
+            Path to all possible labeling artifacts, containing imaging plane
+            data and metadata
         :param num_regions:
             Number of regions to sample
         :param fov_divisor:
@@ -80,34 +86,26 @@ class RegionSampler:
         :param seed:
             Seed for reproducibility
         """
+        if not isinstance(artifact_path, Path):
+            artifact_path = Path(artifact_path)
+        self._artifact_path = artifact_path
         self._num_regions = num_regions
         self._fov_divisor = fov_divisor
         self._seed = seed
 
     def sample(self,
-               experiment_ids: List[str],
-               motion_correction_path: Optional[Path],
                exclude_motion_border=True):
         """
         Samples region candidates without replacement
-        :param experiment_ids
-            List of experiment ids to sample from
-        :param motion_correction_path:
-            Path to motion correction output. Used for excluding regions
-            outside of motion border. Required if exclude_motion_border is True
         :param exclude_motion_border:
             Whether to exclude regions outside of motion border
         :return:
         """
-        if exclude_motion_border and motion_correction_path is None:
-            raise ValueError('motion_correction_path required if '
-                             'exclude_motion_border is True')
-
+        experiment_ids = self._get_experiment_ids()
         all_regions = []
         for experiment_id in experiment_ids:
             regions = self._get_all_regions_for_experiment(
                 experiment_id=experiment_id,
-                motion_correction_path=motion_correction_path,
                 fov_divisor=self._fov_divisor,
                 exclude_motion_border=exclude_motion_border
             )
@@ -120,26 +118,21 @@ class RegionSampler:
                        replace=False)
         return regions
 
-    @staticmethod
     def _get_motion_border_for_experiment(
-            experiment_id: str,
-            motion_correction_path: Path) -> Tuple[int, int]:
+            self,
+            experiment_id: str) -> MotionBorder:
         """Gets the motion border for an experiment
 
         :return
-            motion border x, y values
+            motion border
         """
-        registration_output = motion_correction_path / f'{experiment_id}' / \
-            f'{experiment_id}_rigid_motion_transform.csv'
-        df = pd.read_csv(registration_output)
-        border_x = df['x'].abs().max()
-        border_y = df['y'].abs().max()
-        return border_x, border_y
+        path = self._artifact_path / f'{experiment_id}_artifacts.h5'
+        af = ArtifactFile(path=path)
+        return af.motion_border
 
     def _get_all_regions_for_experiment(
             self,
             experiment_id: str,
-            motion_correction_path: Path,
             exclude_motion_border=True,
             fov_divisor=4
     ) -> List[Region]:
@@ -148,8 +141,6 @@ class RegionSampler:
 
         :param experiment_id
             Experiment id
-        :param motion_correction_path
-            Path to motion correction output
         :param exclude_motion_border
             Whether to exclude the motion border when sampling regions
         :param fov_divisor
@@ -161,26 +152,29 @@ class RegionSampler:
         fov_width, fov_height = FIELD_OF_VIEW_DIMENSIONS
 
         if exclude_motion_border:
-            border_offset_x, border_offset_y = \
-                self._get_motion_border_for_experiment(
-                    experiment_id=experiment_id,
-                    motion_correction_path=motion_correction_path)
+            mb = self._get_motion_border_for_experiment(
+                    experiment_id=experiment_id)
         else:
-            border_offset_x, border_offset_y = 0, 0
+            mb = MotionBorder(
+                left_side=0,
+                right_side=0,
+                top=0,
+                bottom=0
+            )
 
-        within_border_fov_width = fov_width - border_offset_x * 2
-        within_border_fov_height = fov_height - border_offset_y * 2
+        within_border_fov_width = fov_width - mb.left_side - mb.right_side
+        within_border_fov_height = fov_height - mb.top - mb.bottom
 
         region_width, region_height = (int(within_border_fov_width /
                                            fov_divisor),
                                        int(within_border_fov_height /
                                            fov_divisor))
 
-        for y in range(border_offset_y,
-                       fov_height - border_offset_y,
+        for y in range(mb.top,
+                       fov_height - mb.bottom,
                        region_height):
-            for x in range(border_offset_x,
-                           fov_width - border_offset_x,
+            for x in range(mb.left_side,
+                           fov_width - mb.right_side,
                            region_width):
                 region = Region(x=x,
                                 y=y,
@@ -189,6 +183,16 @@ class RegionSampler:
                                 experiment_id=experiment_id)
                 res.append(region)
         return res
+
+    def _get_experiment_ids(self):
+        """Gets the list of experiment ids to sample from from the filename
+        of the hdf5 files"""
+        experiment_ids = []
+        for file in os.listdir(self._artifact_path):
+            af = ArtifactFile(self._artifact_path / file)
+            experiment_ids.append(af.experiment_id)
+        experiment_ids = sorted(experiment_ids)
+        return experiment_ids
 
 
 def populate_labeling_job(regions: List[Region]):
@@ -218,13 +222,6 @@ def populate_labeling_job(regions: List[Region]):
     logger.info(f'Number of regions added to labeling job: {num_added}')
 
 
-def _get_experiment_ids(motion_correction_path: Path):
-    """Gets the list of experiment ids to sample from from the list of
-    experiment ids in the motion correction directory"""
-    experiments = os.listdir(motion_correction_path)
-    return experiments
-
-
 if __name__ == '__main__':
     def main():
         parser = argparse.ArgumentParser()
@@ -247,16 +244,13 @@ if __name__ == '__main__':
                             default=True,
                             help='Whether to exclude the motion border when '
                                  'sampling regions')
-        parser.add_argument('--motion_correction_path', required=True,
-                            help='Path to motion correction output. Used for '
-                                 'sampling within motion border and for '
-                                 'extracting list of all experiment ids.')
+        parser.add_argument('--artifact_files_dir', required=True,
+                            help='Path to labeling artifact hdf5 files')
         args = parser.parse_args()
         n = int(args.n)
 
         config_path = Path(args.config_path)
-        motion_correction_path = Path(args.motion_correction_path) if \
-            args.motion_correction_path else None
+        artifacts_dir = Path(args.artifact_files_dir)
 
         app = create_app(config_file=config_path)
         if not Path(app.config['SQLALCHEMY_DATABASE_URI']
@@ -265,12 +259,9 @@ if __name__ == '__main__':
                 db.create_all()
         app.app_context().push()
 
-        sampler = RegionSampler(num_regions=n, fov_divisor=args.fov_divisor)
-        experiment_ids = _get_experiment_ids(
-            motion_correction_path=motion_correction_path)
+        sampler = RegionSampler(num_regions=n, fov_divisor=args.fov_divisor,
+                                artifact_path=artifacts_dir)
         regions = sampler.sample(
-            experiment_ids=experiment_ids,
-            motion_correction_path=motion_correction_path,
             exclude_motion_border=args.exclude_motion_border
         )
         populate_labeling_job(regions=regions)

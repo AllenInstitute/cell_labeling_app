@@ -863,6 +863,58 @@ class CellLabelingApp {
         }
     }
 
+    async getMotionBorderShape() {
+        const field_of_view_dims = await fetch(
+            `http://localhost:${PORT}/get_field_of_view_dimensions`
+        )
+            .then(data => data.json())
+            .then(data => data['field_of_view_dimensions']);
+
+        const mb = await fetch(
+            `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
+        )
+            .then(data => data.json())
+        const sides = ['left_side', 'right_side', 'top', 'bottom'];
+
+        return sides.map(side => {
+            let x0, x1, y0, y1;
+            if (side === 'left_side' || side === 'right_side') {
+                let offset = mb[side];
+                if (side === 'right_side') {
+                    offset = field_of_view_dims[0] - offset;
+                }
+                x0 = offset;
+                y0 = 0;
+
+                y1 = field_of_view_dims[1];
+                x1 = offset;
+            } else {
+                let offset = mb[side];
+                if (side === 'bottom') {
+                    offset = field_of_view_dims[1] - offset;
+                }
+                x0 = 0;
+                y0 = offset;
+
+                x1 = field_of_view_dims[0];
+                y1 = offset;
+            }
+
+            return {
+                type: 'rect',
+                opacity: 1.0,
+                line: {
+                    color: 'rgb(255, 0, 0)',
+                    dash: 'longdash'
+                },
+                x0,
+                y0,
+                x1,
+                y1
+            }
+        });
+    }
+
     removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
         if (this.selected_roi !== null &&
             this.selected_roi.contours === null &&
@@ -880,7 +932,9 @@ class CellLabelingApp {
         const contours = await this.getRoiContourShapes();
         const points = this.getRoiPointShapes();
         const regionBoundary = this.getRegionBoundariesShape();
-        const shapes = [...contours, ...points, regionBoundary];
+        const motionBorder = await this.getMotionBorderShape();
+        const shapes = [...contours, ...points, regionBoundary,
+            ...motionBorder];
         Plotly.relayout('projection', {'shapes': shapes});
     }
 }

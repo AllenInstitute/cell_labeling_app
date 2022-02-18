@@ -3,10 +3,10 @@ from pathlib import Path
 
 from flask import Flask
 
-from server.database.database import db
-from server.endpoints.endpoints import api
-from server.endpoints.user_authentication import users
-from server.user_authentication.user_authentication import login
+from cell_labeling_app.database.database import db
+from cell_labeling_app.endpoints.endpoints import api
+from cell_labeling_app.endpoints.user_authentication import users
+from cell_labeling_app.user_authentication.user_authentication import login
 
 
 def create_app(config_file: Path, port=5000):
@@ -16,7 +16,7 @@ def create_app(config_file: Path, port=5000):
         raise ValueError('Config file must be a python module ending in '
                            '".py"')
 
-    template_dir = (Path(__file__).parent.parent / 'client').resolve()
+    template_dir = (Path(__file__).parent.parent.parent / 'client').resolve()
     static_dir = template_dir
     app = Flask(__name__, static_folder=static_dir,
                           template_folder=str(template_dir))
