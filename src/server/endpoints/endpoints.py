@@ -1,10 +1,9 @@
 import json
 import random
 from io import BytesIO
-from typing import List, Tuple
+from typing import List
 
 import cv2
-import h5py
 import numpy as np
 from PIL import Image
 from flask import render_template, request, send_file, Blueprint, current_app, \
@@ -18,6 +17,8 @@ from server.database.schemas import LabelingJob, JobRegion, UserLabels, \
     UserRoiExtra
 from server.util import util
 from server.util.util import get_artifacts_path
+
+from src.server.artifact import ArtifactFile
 
 api = Blueprint(name='api', import_name=__name__)
 
@@ -111,20 +112,11 @@ def get_projection():
 
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    with h5py.File(artifact_path, 'r') as f:
-        if projection_type == 'max':
-            dataset_name = 'max_projection'
-        elif projection_type == 'average':
-            dataset_name = 'avg_projection'
-        elif projection_type == 'correlation':
-            dataset_name = 'correlation_projection'
-        else:
-            return 'bad projection type', 400
-        projection = f[dataset_name][:]
-
-    if len(projection.shape) == 3:
-        projection = projection[:, :, 0]
-    projection = projection.astype('uint16')
+    af = ArtifactFile(path=artifact_path)
+    try:
+        projection = af.get_projection(projection_type=projection_type)
+    except ValueError as e:
+        return e, 400
 
     image = Image.fromarray(projection)
     image = image.tobytes()
@@ -171,8 +163,8 @@ def get_video():
 
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    with h5py.File(artifact_path, 'r') as f:
-        video_generator = VideoGenerator(video_data=f['video_data'][()])
+    af = ArtifactFile(path=artifact_path)
+    video_generator = VideoGenerator(video_data=af.video)
 
     region = (db.session.query(JobRegion)
               .filter(JobRegion.id == region_id)
@@ -313,8 +305,8 @@ def find_roi_at_coordinates():
               .first())
 
     artifact_path = get_artifacts_path(experiment_id=region.experiment_id)
-    with h5py.File(artifact_path, 'r') as f:
-        rois = json.loads((f['rois'][()]))
+    af = ArtifactFile(path=artifact_path)
+    rois = af.rois
 
     # 1) First limit candidate rois to rois in region
     rois = [x for x in rois if x['id'] in rois_in_region]

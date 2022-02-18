@@ -1,11 +1,9 @@
 import base64
-import json
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List
 
 import cv2
-import h5py
 import matplotlib.cm
 import numpy as np
 import pandas as pd
@@ -13,6 +11,8 @@ from PIL import Image
 from flask import current_app
 
 from server.database.schemas import JobRegion
+
+from src.server.artifact import ArtifactFile
 
 
 def _is_roi_within_region(roi: Dict, region: JobRegion,
@@ -101,8 +101,8 @@ def get_rois_in_region(region: JobRegion,
             - classifier_score: classifier score
     """
     artifact_path = get_artifacts_path(experiment_id=region.experiment_id)
-    with h5py.File(artifact_path, 'r') as f:
-        rois = json.loads((f['rois'][()]))
+    af = ArtifactFile(path=artifact_path)
+    rois = af.rois
 
     res = []
     for roi in rois:
@@ -206,16 +206,14 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
 
 def get_trace(experiment_id: str, roi_id: str, point: Optional[List] = None):
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
+    af = ArtifactFile(path=artifact_path)
 
     if point is None:
         # retrieve precomputed trace
-        with h5py.File(artifact_path, 'r') as f:
-            trace = (f['traces'][roi_id][()])
+        trace = af.get_trace(roi_id=roi_id)
     else:
         # Pull the trace from the video for the point
-        x, y = point
-        with h5py.File(artifact_path, 'r') as f:
-            trace = (f['video_data'][:][:, y, x])
+        trace = af.get_trace(point=point)
     return trace
 
 
