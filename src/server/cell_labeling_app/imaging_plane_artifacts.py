@@ -121,4 +121,4 @@ class ArtifactFile:
     def _get_trace_for_point(self, point: List) -> np.ndarray:
         x, y = point
         with h5py.File(self._path, 'r') as f:
-            return f['video_data'][()][:, y, x]
+            return f['video_data'][:, y, x]
