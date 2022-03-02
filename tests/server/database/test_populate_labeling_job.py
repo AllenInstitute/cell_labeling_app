@@ -3,6 +3,10 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import List
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
 
 import h5py
 import pytest
@@ -65,13 +69,24 @@ LOG_FILE = ''
 
     @pytest.mark.parametrize('fov_divisor', (1, 2, 4))
     @pytest.mark.parametrize('exclude_motion_border', (True, False))
-    def test_sampler(self, fov_divisor, exclude_motion_border):
+    def test_sampler(self,
+                     fov_divisor,
+                     exclude_motion_border):
         """tests that sampled regions are as expected"""
-        sampler = RegionSampler(num_regions=1, fov_divisor=fov_divisor,
-                                artifact_path=self.artifacts_path.name)
-        regions = sampler.sample(
-            exclude_motion_border=exclude_motion_border
-        )
+        with patch.object(RegionSampler,
+                          '_sample_experiments',
+                          return_value=(1,)), \
+             patch.object(RegionSampler,
+                          '_retrieve_depths',
+                          return_value=MagicMock(spec=pd.DataFrame)):
+            sampler = RegionSampler(num_experiments=1,
+                                    num_regions_per_exp=1,
+                                    fov_divisor=fov_divisor,
+                                    db_url='',
+                                    artifact_path=self.artifacts_path.name)
+            regions = sampler.sample(
+                exclude_motion_border=exclude_motion_border,
+            )
         if exclude_motion_border:
             motion_border = self.motion_border
         else:
@@ -91,7 +106,10 @@ LOG_FILE = ''
                                             exclude_motion_border):
         """tests that total number of regions is correct and all regions
         are as expected"""
-        sampler = RegionSampler(num_regions=1, fov_divisor=fov_divisor,
+        sampler = RegionSampler(num_experiments=1,
+                                num_regions_per_exp=1,
+                                fov_divisor=fov_divisor,
+                                db_url='',
                                 artifact_path=self.artifacts_path.name)
         regions = sampler._get_all_regions_for_experiment(
             experiment_id='1', exclude_motion_border=exclude_motion_border,
@@ -111,18 +129,91 @@ LOG_FILE = ''
                                    fov_divisor=fov_divisor)
         assert len(regions) == fov_divisor ** 2
 
+    @pytest.mark.parametrize('fov_divisor', (1, 2, 4))
+    @pytest.mark.parametrize('exclude_motion_border', (True, False))
+    def test_pre_sampled_ids(self,
+                             fov_divisor,
+                             exclude_motion_border):
+        """tests that sampled regions are as expected"""
+        csv_file = tempfile.mkstemp()
+        id_df = pd.DataFrame(data={"exp_id": (1,)})
+        id_df.to_csv(csv_file[1])
+
+        with patch.object(RegionSampler,
+                          '_retrieve_depths',
+                          return_value=MagicMock(spec=pd.DataFrame)):
+            sampler = RegionSampler(selected_experiments_path=csv_file[1],
+                                    num_regions_per_exp=1,
+                                    fov_divisor=fov_divisor,
+                                    db_url='',
+                                    artifact_path=self.artifacts_path.name)
+            regions = sampler.sample(
+                exclude_motion_border=exclude_motion_border,
+            )
+
+        if exclude_motion_border:
+            motion_border = self.motion_border
+        else:
+            motion_border = MotionBorder(
+                top=0,
+                bottom=0,
+                left_side=0,
+                right_side=0
+            )
+        self._regions_are_expected(regions=regions,
+                                   motion_border=motion_border,
+                                   fov_divisor=fov_divisor)
+
+    def test_raises(self):
+        with pytest.raises(ValueError, match=r'Please specify either .*'):
+            RegionSampler(num_regions_per_exp=1,
+                          artifact_path=self.artifacts_path.name)
+
+        with pytest.raises(ValueError, match=r'Number of requested .*'):
+            RegionSampler(num_experiments=1,
+                          db_url='',
+                          num_regions_per_exp=3,
+                          fov_divisor=1,
+                          artifact_path=self.artifacts_path.name)
+
+    def test_depth_exp_id_sampling(self):
+        """Test that the sampling algorithm selects the expected experiments.
+        """
+        data_frame = pd.DataFrame(data={"exp_id": [1, 2, 3, 4],
+                                        "imaging_depth": [10, 10, 10, 12],
+                                        "im_id": [7, 8, 9, 10]})
+
+        rng = np.random.default_rng(1234)
+        sampler = RegionSampler(artifact_path=self.artifacts_path.name,
+                                num_experiments=3,
+                                db_url='',
+                                num_regions_per_exp=1,
+                                fov_divisor=2)
+        selected_experiments = sampler._sample_experiments(
+            data_frame,
+            rng)
+        np.testing.assert_equal(selected_experiments, [1, 3, 4])
+
     @pytest.mark.parametrize('num_regions', (6, 7))
     @pytest.mark.parametrize('exclude_motion_border', (True, False))
     @pytest.mark.parametrize('fov_divisor', (4,))
     def test_create_labeling_job(self, num_regions, exclude_motion_border,
                                  fov_divisor):
         """tests that region entries populated in db are as expected"""
-        sampler = RegionSampler(num_regions=num_regions,
-                                fov_divisor=fov_divisor,
-                                artifact_path=self.artifacts_path.name)
-        regions = sampler.sample(
-            exclude_motion_border=exclude_motion_border
-        )
+        with patch.object(RegionSampler,
+                          '_sample_experiments',
+                          return_value=(1,)), \
+             patch.object(RegionSampler,
+                          '_retrieve_depths',
+                          return_value=MagicMock(spec=pd.DataFrame)):
+            sampler = RegionSampler(num_experiments=1,
+                                    num_regions_per_exp=num_regions,
+                                    fov_divisor=fov_divisor,
+                                    db_url='',
+                                    artifact_path=self.artifacts_path.name)
+            regions = sampler.sample(
+                exclude_motion_border=exclude_motion_border
+            )
         populate_labeling_job(regions=regions)
 
         num_added = db.session.query(JobRegion).filter_by(
@@ -150,12 +241,12 @@ LOG_FILE = ''
         fov_dims = FIELD_OF_VIEW_DIMENSIONS
 
         for region in regions:
-            assert region.x >= motion_border.left_side
-            assert region.x + region.width <= fov_dims[0] - \
-                   motion_border.right_side
-            assert region.y >= motion_border.top
-            assert region.y + region.height <= fov_dims[1] - \
+            assert region.x >= motion_border.top
+            assert region.x + region.height <= fov_dims[1] - \
                    motion_border.bottom
+            assert region.y >= motion_border.left_side
+            assert region.y + region.width <= fov_dims[1] - \
+                   motion_border.right_side
 
             assert region.width == \
                    int((fov_dims[0] -
