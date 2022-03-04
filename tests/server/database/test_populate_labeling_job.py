@@ -85,6 +85,32 @@ LOG_FILE = ''
                                    motion_border=motion_border,
                                    fov_divisor=fov_divisor)
 
+    @pytest.mark.parametrize('fov_divisor', (1, 2, 4))
+    @pytest.mark.parametrize('exclude_motion_border', (True, False))
+    def test_get_all_regions_for_experiment(self, fov_divisor,
+                                            exclude_motion_border):
+        """tests that total number of regions is correct and all regions
+        are as expected"""
+        sampler = RegionSampler(num_regions=1, fov_divisor=fov_divisor,
+                                artifact_path=self.artifacts_path.name)
+        regions = sampler._get_all_regions_for_experiment(
+            experiment_id='1', exclude_motion_border=exclude_motion_border,
+            fov_divisor=fov_divisor)
+
+        if exclude_motion_border:
+            motion_border = self.motion_border
+        else:
+            motion_border = MotionBorder(
+                top=0,
+                bottom=0,
+                left_side=0,
+                right_side=0
+            )
+        self._regions_are_expected(regions=regions,
+                                   motion_border=motion_border,
+                                   fov_divisor=fov_divisor)
+        assert len(regions) == fov_divisor ** 2
+
     @pytest.mark.parametrize('num_regions', (6, 7))
     @pytest.mark.parametrize('exclude_motion_border', (True, False))
     @pytest.mark.parametrize('fov_divisor', (4,))
