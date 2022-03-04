@@ -56,9 +56,11 @@ def _get_classifier_score_for_roi(roi_id: int, experiment_id: str):
     :return:
         Classifier probability of cell for ROI
     """
-    predictions = pd.read_csv(Path(current_app.config['PREDICTIONS_DIR']) /
-                              f'{experiment_id}_inference.csv',
-                              dtype={'experiment_id': str})
+    predictions = pd.read_csv(
+        Path(current_app.config['PREDICTIONS_DIR']) /
+        f'{experiment_id}' / 'predictions' /
+        f'{experiment_id}_inference.csv',
+        dtype={'experiment_id': str})
     predictions = predictions[predictions['experiment_id'] == experiment_id]
     predictions = predictions.set_index('roi-id')
 
