@@ -51,9 +51,10 @@ if __name__ == '__main__':
     config_file = Path(args.config_file)
 
     app = create_app(config_file=config_file, debug=args.debug)
+    port = app.config['PORT']
 
     if args.debug:
-        app.run(debug=True)
+        app.run(debug=True, port=port)
     else:
         from waitress import serve
-        serve(app, threads=args.threads)
+        serve(app, port=port, threads=args.threads)
