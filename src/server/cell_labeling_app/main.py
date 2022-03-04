@@ -49,12 +49,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config_file = Path(args.config_file)
-    port = int(args.port)
 
     app = create_app(config_file=config_file, debug=args.debug)
 
     if args.debug:
-        app.run(debug=True, port=port)
+        app.run(debug=True)
     else:
         from waitress import serve
-        serve(app, port=port, threads=args.threads)
+        serve(app, threads=args.threads)
