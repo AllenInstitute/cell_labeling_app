@@ -12,6 +12,8 @@ from cell_labeling_app.main import create_app
 from cell_labeling_app.database.populate_labeling_job import RegionSampler, \
     FIELD_OF_VIEW_DIMENSIONS, populate_labeling_job, Region
 
+from src.server.cell_labeling_app.imaging_plane_artifacts import MotionBorder
+
 
 class TestPopulateLabelingJob:
     """Tests region sampling and job creation"""
@@ -20,17 +22,21 @@ class TestPopulateLabelingJob:
         self.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
         self.config_fp = tempfile.NamedTemporaryFile('w', suffix='.py')
 
-        self.motion_border_x = 10
-        self.motion_border_y = 20
+        self.motion_border = MotionBorder(
+            top=30,
+            bottom=30,
+            left_side=30,
+            right_side=28
+        )
 
         for exp_id in (1,):
             exp_id_path = Path(self.artifacts_path.name)
             with h5py.File(exp_id_path / f'{exp_id}_artifacts.h5', 'w') as f:
                 mb = {
-                    'top': self.motion_border_y,
-                    'right_side': self.motion_border_x,
-                    'bottom': self.motion_border_y,
-                    'left_side': self.motion_border_x
+                    'top': self.motion_border.top,
+                    'right_side': self.motion_border.right_side,
+                    'bottom': self.motion_border.bottom,
+                    'left_side': self.motion_border.left_side
                 }
                 mb = json.dumps(mb)
                 f.create_dataset('motion_border', data=mb)
@@ -68,14 +74,16 @@ LOG_FILE = ''
             exclude_motion_border=exclude_motion_border
         )
         if exclude_motion_border:
-            motion_border_x = self.motion_border_x
-            motion_border_y = self.motion_border_y
+            motion_border = self.motion_border
         else:
-            motion_border_x = 0
-            motion_border_y = 0
+            motion_border = MotionBorder(
+                top=0,
+                bottom=0,
+                left_side=0,
+                right_side=0
+            )
         self._regions_are_expected(regions=regions,
-                                   motion_border_y=motion_border_y,
-                                   motion_border_x=motion_border_x,
+                                   motion_border=motion_border,
                                    fov_divisor=fov_divisor)
 
     @pytest.mark.parametrize('num_regions', (6, 7))
@@ -97,33 +105,38 @@ LOG_FILE = ''
         assert num_added == num_regions
 
         if exclude_motion_border:
-            motion_border_x = self.motion_border_x
-            motion_border_y = self.motion_border_y
+            motion_border = self.motion_border
         else:
-            motion_border_x = 0
-            motion_border_y = 0
+            motion_border = MotionBorder(
+                top=0,
+                bottom=0,
+                left_side=0,
+                right_side=0
+            )
         regions = db.session.query(JobRegion).all()
         self._regions_are_expected(regions=regions,
-                                   motion_border_x=motion_border_x,
-                                   motion_border_y=motion_border_y,
+                                   motion_border=motion_border,
                                    fov_divisor=fov_divisor)
 
     @staticmethod
     def _regions_are_expected(regions: List[Region],
-                              motion_border_x: int,
-                              motion_border_y: int,
+                              motion_border: MotionBorder,
                               fov_divisor: int):
         fov_dims = FIELD_OF_VIEW_DIMENSIONS
 
         for region in regions:
-            assert region.x >= motion_border_x
+            assert region.x >= motion_border.left_side
             assert region.x + region.width <= fov_dims[0] - \
-                   motion_border_x
-            assert region.y >= motion_border_y
+                   motion_border.right_side
+            assert region.y >= motion_border.top
             assert region.y + region.height <= fov_dims[1] - \
-                   motion_border_y
+                   motion_border.bottom
 
-            assert region.width == int((fov_dims[0] - motion_border_x * 2) /
-                                       fov_divisor)
-            assert region.height == int((fov_dims[1] - motion_border_y * 2) /
-                                        fov_divisor)
+            assert region.width == \
+                   int((fov_dims[0] -
+                        motion_border.left_side - motion_border.right_side) /
+                       fov_divisor)
+            assert region.height == \
+                   int((fov_dims[1] -
+                        motion_border.top - motion_border.bottom) /
+                       fov_divisor)
