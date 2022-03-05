@@ -290,8 +290,6 @@ class CellLabelingApp {
             $('button#projection_contrast_reset').attr('disabled', false);
             $('input#projection_contrast_low_quantile').attr('disabled', false);
             $('input#projection_contrast_high_quantile').attr('disabled', false);
-            $('#region_meta').html(
-                `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`)
 
             await this.updateShapesOnProjection();
 
@@ -469,6 +467,8 @@ class CellLabelingApp {
         const region = await this.getRandomRegionFromRandomExperiment()
             .then(region => {
                 this.is_loading_new_region = false;
+                $('#region_meta').html(
+                    `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
                 return region;
             })
             .catch(() => {
