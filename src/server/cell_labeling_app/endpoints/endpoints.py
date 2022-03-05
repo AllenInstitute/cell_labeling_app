@@ -1,5 +1,4 @@
 import json
-import random
 from io import BytesIO
 from typing import List
 
@@ -10,14 +9,14 @@ from flask import render_template, request, send_file, Blueprint, \
     current_app, Request
 from flask_login import current_user
 from ophys_etl.utils.thumbnail_video_generator import VideoGenerator
-from sqlalchemy import desc
 
 from cell_labeling_app.database.database import db
-from cell_labeling_app.database.schemas import LabelingJob, JobRegion, \
+from cell_labeling_app.database.schemas import JobRegion, \
     UserLabels, UserRoiExtra
 from cell_labeling_app.util import util
 from cell_labeling_app.util.util import get_artifacts_path
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
+from cell_labeling_app.util.util import get_next_region
 
 api = Blueprint(name='api', import_name=__name__)
 
@@ -53,42 +52,13 @@ def get_roi_contours():
 
 @api.route("/get_random_region")
 def get_random_region():
-    # job id is most recently created job id
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).first()[0]
-
-    # Get all region ids user has labeled
-    user_has_labeled = \
-        (db.session
-         .query(UserLabels.region_id)
-         .join(JobRegion, JobRegion.id == UserLabels.region_id)
-         .filter(JobRegion.job_id == job_id,
-                 UserLabels.user_id == current_user.get_id())
-         .all())
-
-    # Get initial next region candidates query
-    next_region_candidates = \
-        (db.session
-         .query(JobRegion)
-         .filter(JobRegion.job_id == job_id))
-
-    # Add filter to next_region_candidates query so user does not label a
-    # region that has already been labeled
-    for region_id in user_has_labeled:
-        region_id = region_id[0]
-        next_region_candidates = next_region_candidates.filter(
-            JobRegion.id != region_id)
-
-    next_region_candidates = next_region_candidates.all()
-
-    if not next_region_candidates:
+    next_region = get_next_region()
+    if not next_region:
         # No more to label
         return {
             'experiment_id': None,
             'region': None
         }
-
-    next_region: JobRegion = random.choice(next_region_candidates)
 
     region = {
         'experiment_id': next_region.experiment_id,

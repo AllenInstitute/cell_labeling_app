@@ -1,4 +1,5 @@
 import base64
+import random
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List
@@ -8,10 +9,14 @@ import matplotlib.cm
 import numpy as np
 import pandas as pd
 from PIL import Image
+from cell_labeling_app.database.database import db
 from flask import current_app
 
-from cell_labeling_app.database.schemas import JobRegion
+from cell_labeling_app.database.schemas import JobRegion, UserLabels, \
+    LabelingJob
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
+from flask_login import current_user
+from sqlalchemy import func, desc
 
 
 def _is_roi_within_region(roi: Dict, region: JobRegion,
@@ -222,3 +227,78 @@ def get_artifacts_path(experiment_id: str):
     artifact_dir = Path(current_app.config['ARTIFACT_DIR'])
     artifact_path = artifact_dir / f'{experiment_id}_artifacts.h5'
     return artifact_path
+
+
+def _get_completed_regions(job_id: int) -> List[str]:
+    """
+    This returns the regions with sufficient number of labels
+    :param job_id
+        The job id
+    :rtype: list of string
+        list of completed region ids
+    """
+    region_label_counts = \
+        (db.session
+         .query(UserLabels.region_id,
+                func.count())
+         .join(JobRegion, JobRegion.id == UserLabels.region_id)
+         .filter(JobRegion.job_id == job_id)
+         .group_by(UserLabels.region_id)
+         .all())
+    region_label_counts = pd.DataFrame.from_records(
+        region_label_counts, columns=['region_id', 'count'])
+    regions_with_enough_labels = \
+        region_label_counts.loc[
+            region_label_counts['count'] ==
+            current_app.config['LABELS_PER_REGION_LIMIT'],
+            'region_id'].tolist()
+    return regions_with_enough_labels
+
+
+def get_next_region() -> Optional[JobRegion]:
+    """Samples a region randomly from a set of candidate regions.
+    The candidate regions are those that have not already been labeled by the
+    labeler and those that have not been labeled enough times by other
+    labelers
+    :rtype: optional JobRegion
+        JobRegion, if a candidate region exists, otherwise None
+    """
+    # job id is most recently created job id
+    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
+        LabelingJob.date)).first()[0]
+
+    # Get all region ids user has labeled
+    user_has_labeled = \
+        (db.session
+         .query(UserLabels.region_id)
+         .join(JobRegion, JobRegion.id == UserLabels.region_id)
+         .filter(JobRegion.job_id == job_id,
+                 UserLabels.user_id == current_user.get_id())
+         .all())
+    user_has_labeled = [region.region_id for region in user_has_labeled]
+
+    if current_app.config['LABELS_PER_REGION_LIMIT'] is not None:
+        regions_with_enough_labels = _get_completed_regions(job_id=job_id)
+        exclude_regions = user_has_labeled + regions_with_enough_labels
+    else:
+        exclude_regions = user_has_labeled
+
+    # Get initial next region candidates query
+    next_region_candidates = \
+        (db.session
+         .query(JobRegion)
+         .filter(JobRegion.job_id == job_id))
+
+    # Add filter to next_region_candidates query so user does not label a
+    # region that has already been labeled
+    for region_id in exclude_regions:
+        next_region_candidates = next_region_candidates.filter(
+            JobRegion.id != region_id)
+
+    next_region_candidates = next_region_candidates.all()
+    next_region: Optional[JobRegion]
+    if not next_region_candidates:
+        next_region = None
+    else:
+        next_region = random.choice(next_region_candidates)
+    return next_region
