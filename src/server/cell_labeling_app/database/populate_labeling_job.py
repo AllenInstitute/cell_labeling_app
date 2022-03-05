@@ -6,11 +6,11 @@ from typing import List, Union
 
 import numpy as np
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
+from flask import Flask
 from sqlalchemy import desc
 
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import LabelingJob, JobRegion
-from cell_labeling_app.main import create_app
 
 from cell_labeling_app.imaging_plane_artifacts import MotionBorder
 
@@ -225,6 +225,9 @@ def populate_labeling_job(regions: List[Region]):
 if __name__ == '__main__':
     def main():
         parser = argparse.ArgumentParser()
+        parser.add_argument('--database_path', required=True,
+                            help='Path to where the database should get '
+                                 'created')
         parser.add_argument('--config_path', required=True,
                             help='Path to app config')
         parser.add_argument('--n', required=True,
@@ -249,12 +252,13 @@ if __name__ == '__main__':
         args = parser.parse_args()
         n = int(args.n)
 
-        config_path = Path(args.config_path)
         artifacts_dir = Path(args.artifact_files_dir)
+        database_path = Path(args.database_path)
 
-        app = create_app(config_file=config_path)
-        if not Path(app.config['SQLALCHEMY_DATABASE_URI']
-                    .replace('sqlite:///', '')).is_file():
+        app = Flask(__name__)
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
+        db.init_app(app)
+        if not database_path.is_file():
             with app.app_context():
                 db.create_all()
         app.app_context().push()

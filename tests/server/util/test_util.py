@@ -1,6 +1,5 @@
 import json
 import tempfile
-from pathlib import Path
 from typing import Optional
 from unittest.mock import patch, MagicMock
 
@@ -8,8 +7,8 @@ import pytest
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.populate_labeling_job import Region
 from cell_labeling_app.database.schemas import UserLabels
-from cell_labeling_app.main import create_app
 from cell_labeling_app.database.schemas import User, LabelingJob, JobRegion
+from flask import Flask
 from sqlalchemy import desc
 
 from cell_labeling_app.util.util import get_next_region
@@ -19,23 +18,14 @@ class TestGetNextRegion:
     @classmethod
     def setup_class(cls):
         cls.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
-        cls.config_fp = tempfile.NamedTemporaryFile('w', suffix='.py')
 
     def _init_db(self, labels_per_region_limit: Optional[int] = None):
         db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
-        config_fp = tempfile.NamedTemporaryFile('w', suffix='.py')
 
-        config = f'''
-SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_fp.name}'
-SESSION_SECRET_KEY = 1
-SQLALCHEMY_TRACK_MODIFICATIONS = False
-LOG_FILE = ''
-LABELS_PER_REGION_LIMIT = {labels_per_region_limit}
-        '''
-        config_fp.write(config)
-        config_fp.seek(0)
-
-        app = create_app(config_file=Path(config_fp.name))
+        app = Flask(__name__)
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_fp.name}'
+        app.config['LABELS_PER_REGION_LIMIT'] = labels_per_region_limit
+        db.init_app(app)
         with app.app_context():
             db.create_all()
         app.app_context().push()
@@ -43,14 +33,12 @@ LABELS_PER_REGION_LIMIT = {labels_per_region_limit}
         self.app = app
 
         self.db_fp = db_fp
-        self.config_fp = config_fp
 
         self.user_ids = list(range(4))
         self._populate_users()
         self._populate_labeling_job()
 
     def teardown(self):
-        self.config_fp.close()
         self.db_fp.close()
 
     def _populate_users(self):

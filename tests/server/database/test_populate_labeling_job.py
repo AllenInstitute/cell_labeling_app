@@ -8,10 +8,11 @@ import h5py
 import pytest
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import JobRegion
-from cell_labeling_app.main import create_app
 from cell_labeling_app.database.populate_labeling_job import RegionSampler, \
     FIELD_OF_VIEW_DIMENSIONS, populate_labeling_job, Region
 from cell_labeling_app.imaging_plane_artifacts import MotionBorder
+from cell_labeling_app.main import App
+from flask import Flask
 
 
 class TestPopulateLabelingJob:
@@ -19,7 +20,6 @@ class TestPopulateLabelingJob:
     def setup_class(self):
         self.artifacts_path = tempfile.TemporaryDirectory()
         self.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
-        self.config_fp = tempfile.NamedTemporaryFile('w', suffix='.py')
 
         self.motion_border = MotionBorder(
             top=30,
@@ -41,24 +41,15 @@ class TestPopulateLabelingJob:
                 f.create_dataset('motion_border', data=mb)
 
     def teardown_class(self):
-        self.config_fp.close()
         self.db_fp.close()
         shutil.rmtree(self.artifacts_path.name)
 
     def setup_method(self, method):
         self.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
-        self.config_fp = tempfile.NamedTemporaryFile('w', suffix='.py')
 
-        config = f'''
-SQLALCHEMY_DATABASE_URI = f'sqlite:///{self.db_fp.name}'
-SESSION_SECRET_KEY = 1
-SQLALCHEMY_TRACK_MODIFICATIONS = False
-LOG_FILE = ''
-        '''
-        self.config_fp.write(config)
-        self.config_fp.seek(0)
-
-        app = create_app(config_file=Path(self.config_fp.name))
+        app = Flask(__name__)
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{self.db_fp.name}'
+        db.init_app(app)
         with app.app_context():
             db.create_all()
         app.app_context().push()
