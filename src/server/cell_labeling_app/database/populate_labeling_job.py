@@ -171,10 +171,10 @@ class RegionSampler:
                                            fov_divisor))
 
         for y in range(mb.top,
-                       fov_height - mb.bottom,
+                       fov_height - mb.bottom - region_height + 1,
                        region_height):
             for x in range(mb.left_side,
-                           fov_width - mb.right_side,
+                           fov_width - mb.right_side - region_width + 1,
                            region_width):
                 region = Region(x=x,
                                 y=y,
