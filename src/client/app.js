@@ -290,6 +290,8 @@ class CellLabelingApp {
             $('button#projection_contrast_reset').attr('disabled', false);
             $('input#projection_contrast_low_quantile').attr('disabled', false);
             $('input#projection_contrast_high_quantile').attr('disabled', false);
+            $('#region_meta').html(
+                `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`)
 
             await this.updateShapesOnProjection();
 
