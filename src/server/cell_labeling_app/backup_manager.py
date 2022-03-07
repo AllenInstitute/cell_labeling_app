@@ -53,7 +53,7 @@ class BackupManager:
                 time.sleep(self._frequency)
 
     def _make_backup(self):
-        backup_path = self._backup_dir / f'{self._database_path.name}_' / \
+        backup_path = self._backup_dir / f'{self._database_path.name}_' \
                       f'{int(time.time())}.db'
         shutil.copy(self._database_path, backup_path)
 
