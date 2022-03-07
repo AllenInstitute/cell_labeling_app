@@ -859,9 +859,9 @@ class CellLabelingApp {
                 color: 'rgb(255, 255, 255)'
             },
             y0: this.region.x,
-            y1: this.region.x + this.region.width,
+            y1: this.region.x + this.region.height,
             x0: this.region.y,
-            x1: this.region.y + this.region.height
+            x1: this.region.y + this.region.width
         }
     }
 
