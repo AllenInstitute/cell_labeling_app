@@ -101,13 +101,6 @@ class App(argschema.ArgSchemaParser):
         app.register_blueprint(users)
         app.secret_key = app.config['SESSION_SECRET_KEY']
 
-        log_level = logging.DEBUG if self.args['debug'] else logging.INFO
-        logging.basicConfig(
-            filename=app.config['LOG_FILE'],
-            level=log_level,
-            format='%(asctime)s %(levelname)-8s %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S')
-
         login.init_app(app)
         self._create_backup_manager(app)
 
@@ -127,4 +120,14 @@ class App(argschema.ArgSchemaParser):
 
 if __name__ == '__main__':
     app = App()
+
+    log_level = logging.DEBUG if app.args['debug'] else logging.INFO
+    logging.basicConfig(
+        filename=app.args['LOG_FILE'],
+        level=log_level,
+        format='%(name)s: %(asctime)s %(levelname)-8s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        force=True
+    )
+
     app.run()
