@@ -885,21 +885,21 @@ class CellLabelingApp {
                 if (side === 'right_side') {
                     offset = field_of_view_dims[0] - offset;
                 }
-                y0 = offset;
-                x0 = 0;
+                x0 = offset;
+                y0 = 0;
 
-                x1 = field_of_view_dims[1];
-                y1 = offset;
+                y1 = field_of_view_dims[1];
+                x1 = offset;
             } else {
                 let offset = mb[side];
                 if (side === 'bottom') {
                     offset = field_of_view_dims[1] - offset;
                 }
-                y0 = 0;
-                x0 = offset;
+                x0 = 0;
+                y0 = offset;
 
-                y1 = field_of_view_dims[0];
-                x1 = offset;
+                x1 = field_of_view_dims[0];
+                y1 = offset;
             }
 
             return {
