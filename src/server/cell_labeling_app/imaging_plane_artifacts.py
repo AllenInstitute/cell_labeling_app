@@ -67,15 +67,15 @@ class ArtifactFile:
     def rois(self) -> List[dict]:
         with h5py.File(self._path, 'r') as f:
             return json.loads((f['rois'][()]))
-    
+
     @property
     def motion_border(self) -> MotionBorder:
         with h5py.File(self._path, 'r') as f:
             mb = json.loads(f['motion_border'][()])
-            mb = MotionBorder(left_side=mb['left_side'],
-                              right_side=mb['right_side'],
-                              top=mb['top'],
-                              bottom=mb['bottom'])
+            mb = MotionBorder(left_side=int(mb['left_side']),
+                              right_side=int(mb['right_side']),
+                              top=int(mb['top']),
+                              bottom=int(mb['bottom']))
         return mb
 
     def get_projection(self, projection_type: str) -> np.ndarray:
