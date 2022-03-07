@@ -229,11 +229,26 @@ def get_fov_bounds():
     x_min, x_max = x.min(), (x + widths).max()
     y_min, y_max = y.min(), (y + heights).max()
 
-    return {
-        'x': [float(x_min), float(x_max)],
+    # Find the larger box, either the region box or the box containing all ROIs
+    # that are contained within or overlap within the box
+    # The box containing all ROIs will be smaller in the case there are few
+    # ROIs within the region, and they are close together.
+    # This ensures that we always return at least the region box
+    # Region x is row and region y and col
+    x_range = [
+        min(float(x_min), region.y),
+        max(float(x_max), region.y + region.width)
+    ]
 
+    y_range = [
         # Reversing because origin of plot is top-left instead of bottom-left
-        'y': [float(y_max), float(y_min)]
+        max(float(y_max), region.x + region.height),
+        min(float(y_min), region.y)
+    ]
+
+    return {
+        'x': x_range,
+        'y': y_range
     }
 
 
