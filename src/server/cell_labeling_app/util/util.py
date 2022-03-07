@@ -249,7 +249,7 @@ def _get_completed_regions(job_id: int) -> List[str]:
         region_label_counts, columns=['region_id', 'count'])
     regions_with_enough_labels = \
         region_label_counts.loc[
-            region_label_counts['count'] ==
+            region_label_counts['count'] >=
             current_app.config['LABELS_PER_REGION_LIMIT'],
             'region_id'].tolist()
     return regions_with_enough_labels
