@@ -37,8 +37,8 @@ def _is_roi_within_region(roi: Dict, region: JobRegion,
         True if ROI is within region else False
     """
     region_mask = np.zeros(field_of_view_dimension, dtype='uint8')
-    region_mask[region.x:region.x+region.width,
-                region.y:region.y+region.height] = 1
+    region_mask[region.x:region.x+region.height,
+                region.y:region.y+region.width] = 1
 
     roi_mask = np.zeros(field_of_view_dimension, dtype='uint8')
     roi_mask[roi['y']:roi['y']+roi['height'],
