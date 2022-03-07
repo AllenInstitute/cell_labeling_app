@@ -1,8 +1,10 @@
 import logging
+import threading
 import uuid
 from pathlib import Path
 
 import argschema
+from cell_labeling_app.backup_manager import BackupManager
 from flask import Flask
 
 from cell_labeling_app.database.database import db
@@ -11,11 +13,17 @@ from cell_labeling_app.endpoints.user_authentication import users
 from cell_labeling_app.user_authentication.user_authentication import login
 
 
+class _BackupSchema(argschema.ArgSchema):
+    frequency = argschema.fields.Integer(
+        default=60 * 5,
+        description='Number of seconds to wait before creating a new backup'
+    )
+
+
 class AppSchema(argschema.ArgSchema):
-    SQLALCHEMY_DATABASE_URI = argschema.fields.Str(
+    database_path = argschema.fields.InputFile(
         required=True,
-        description='Database URI',
-        validate=lambda x: Path(x.replace('sqlite:///', '')).exists()
+        description='Database path',
     )
     ARTIFACT_DIR = argschema.fields.InputDir(
         required=True,
@@ -57,6 +65,10 @@ class AppSchema(argschema.ArgSchema):
         default=16,
         description='Number of threads to use for the webserver'
     )
+    backup_params = argschema.fields.Nested(
+        _BackupSchema,
+        default={}
+    )
 
 
 class App(argschema.ArgSchemaParser):
@@ -78,6 +90,8 @@ class App(argschema.ArgSchemaParser):
         static_dir = template_dir
         app = Flask(__name__, static_folder=static_dir,
                     template_folder=str(template_dir))
+        app.config['SQLALCHEMY_DATABASE_URI'] = \
+            f'sqlite:///{self.args["database_path"]}'
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SESSION_SECRET_KEY'] = str(uuid.uuid4())
         app.register_blueprint(api)
@@ -88,10 +102,27 @@ class App(argschema.ArgSchemaParser):
         app.secret_key = app.config['SESSION_SECRET_KEY']
 
         log_level = logging.DEBUG if self.args['debug'] else logging.INFO
-        logging.basicConfig(filename=app.config['LOG_FILE'], level=log_level)
+        logging.basicConfig(
+            filename=app.config['LOG_FILE'],
+            level=log_level,
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S')
 
         login.init_app(app)
+        self._create_backup_manager(app)
+
         return app
+
+    def _create_backup_manager(self, app):
+        database_path = Path(self.args['database_path'])
+        backup_manager = BackupManager(
+            app=app,
+            database_path=database_path,
+            backup_dir=database_path.parent / 'backups',
+            frequency=self.args['backup_params']['frequency']
+        )
+        t = threading.Thread(target=backup_manager.run)
+        t.start()
 
 
 if __name__ == '__main__':

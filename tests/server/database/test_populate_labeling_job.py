@@ -11,7 +11,6 @@ from cell_labeling_app.database.schemas import JobRegion
 from cell_labeling_app.database.populate_labeling_job import RegionSampler, \
     FIELD_OF_VIEW_DIMENSIONS, populate_labeling_job, Region
 from cell_labeling_app.imaging_plane_artifacts import MotionBorder
-from cell_labeling_app.main import App
 from flask import Flask
 
 
