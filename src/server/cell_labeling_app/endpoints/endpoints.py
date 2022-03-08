@@ -361,7 +361,9 @@ def get_label_stats():
     return {
         'n_user_has_labeled': len(user_has_labeled),
         'n_total': total,
-        'n_completed': len(completed)
+        'n_completed': len(completed),
+        'num_labelers_required_per_region':
+            current_app.config['LABELS_PER_REGION_LIMIT']
     }
 
 

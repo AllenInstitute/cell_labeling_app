@@ -470,15 +470,19 @@ class CellLabelingApp {
                 const total = stats['n_total'];
                 const completed = stats['n_completed'];
                 const userLabeled = stats['n_user_has_labeled'];
-                $('p#label_stats').html(
-                    `<p>
+                const numLabelersReqPerRegion = stats['num_labelers_required_per_region'];
+                let html = `
+                    <p>
                         You have labeled
                         <span>${userLabeled}</span> ${userLabeled.length > 1 ? 'regions' : 'region'}
                         and there are <span>${total - userLabeled - completed}</span> remaining
-                    </p>
-
-                    <p>The labeling job is <span>${Math.round(completed / total * 100)}%</span> complete</p>`
-                );
+                    </p>`;
+                if (numLabelersReqPerRegion !== null) {
+                    html += `
+                        <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} people</p>
+                    `;
+                }
+                $('p#label_stats').html(html);
             }
         );
 
