@@ -549,7 +549,7 @@ class CellLabelingApp {
         const contrast = this.#getContrastValues(low, high);
         const projection_type = $('#projection_type').children("option:selected").val();
         Cookies.set('contrast', JSON.stringify({
-                ...JSON.parse(Cookies.get('contrast')),
+                ...JSON.parse(Cookies.get('contrast') ? Cookies.get('contrast') : null),
                 [projection_type]: contrast
         }));
 
