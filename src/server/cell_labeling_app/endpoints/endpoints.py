@@ -1,5 +1,4 @@
 import json
-import random
 from io import BytesIO
 from typing import List
 
@@ -10,14 +9,16 @@ from flask import render_template, request, send_file, Blueprint, \
     current_app, Request
 from flask_login import current_user
 from ophys_etl.utils.thumbnail_video_generator import VideoGenerator
-from sqlalchemy import desc
 
 from cell_labeling_app.database.database import db
-from cell_labeling_app.database.schemas import LabelingJob, JobRegion, \
+from cell_labeling_app.database.schemas import JobRegion, \
     UserLabels, UserRoiExtra
 from cell_labeling_app.util import util
-from cell_labeling_app.util.util import get_artifacts_path
+from cell_labeling_app.util.util import get_artifacts_path, \
+    get_user_has_labeled, get_completed_regions, \
+    get_total_regions_in_labeling_job
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
+from cell_labeling_app.util.util import get_next_region
 
 api = Blueprint(name='api', import_name=__name__)
 
@@ -53,42 +54,13 @@ def get_roi_contours():
 
 @api.route("/get_random_region")
 def get_random_region():
-    # job id is most recently created job id
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).first()[0]
-
-    # Get all region ids user has labeled
-    user_has_labeled = \
-        (db.session
-         .query(UserLabels.region_id)
-         .join(JobRegion, JobRegion.id == UserLabels.region_id)
-         .filter(JobRegion.job_id == job_id,
-                 UserLabels.user_id == current_user.get_id())
-         .all())
-
-    # Get initial next region candidates query
-    next_region_candidates = \
-        (db.session
-         .query(JobRegion)
-         .filter(JobRegion.job_id == job_id))
-
-    # Add filter to next_region_candidates query so user does not label a
-    # region that has already been labeled
-    for region_id in user_has_labeled:
-        region_id = region_id[0]
-        next_region_candidates = next_region_candidates.filter(
-            JobRegion.id != region_id)
-
-    next_region_candidates = next_region_candidates.all()
-
-    if not next_region_candidates:
+    next_region = get_next_region()
+    if not next_region:
         # No more to label
         return {
             'experiment_id': None,
             'region': None
         }
-
-    next_region: JobRegion = random.choice(next_region_candidates)
 
     region = {
         'experiment_id': next_region.experiment_id,
@@ -259,11 +231,26 @@ def get_fov_bounds():
     x_min, x_max = x.min(), (x + widths).max()
     y_min, y_max = y.min(), (y + heights).max()
 
-    return {
-        'x': [float(x_min), float(x_max)],
+    # Find the larger box, either the region box or the box containing all ROIs
+    # that are contained within or overlap within the box
+    # The box containing all ROIs will be smaller in the case there are few
+    # ROIs within the region, and they are close together.
+    # This ensures that we always return at least the region box
+    # Region x is row and region y and col
+    x_range = [
+        min(float(x_min), region.y),
+        max(float(x_max), region.y + region.width)
+    ]
 
+    y_range = [
         # Reversing because origin of plot is top-left instead of bottom-left
-        'y': [float(y_max), float(y_min)]
+        max(float(y_max), region.x + region.height),
+        min(float(y_min), region.x)
+    ]
+
+    return {
+        'x': x_range,
+        'y': y_range
     }
 
 
@@ -357,6 +344,26 @@ def find_roi_at_coordinates():
 
     return {
         'roi_id': None
+    }
+
+
+@api.route('/get_label_stats', methods=['GET'])
+def get_label_stats():
+    """
+    Gets stats on user label counts, and num. remaining
+    :return:
+        Dict of stats
+    """
+    user_has_labeled = get_user_has_labeled()
+    completed = get_completed_regions()
+    total = get_total_regions_in_labeling_job()
+
+    return {
+        'n_user_has_labeled': len(user_has_labeled),
+        'n_total': total,
+        'n_completed': len(completed),
+        'num_labelers_required_per_region':
+            current_app.config['LABELS_PER_REGION_LIMIT']
     }
 
 

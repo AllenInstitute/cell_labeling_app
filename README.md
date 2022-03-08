@@ -15,17 +15,6 @@ Then install the labeling app with
 python setup.py install
 ```
 
-You will need a config file (.py) to run the app. It currently requires the following:
-
-| variable                | description                                                       |
-|-------------------------|-------------------------------------------------------------------|
-| SQLALCHEMY_DATABASE_URI | Path to app database (will get created if does not already exist) |
-| ARTIFACT_DIR            | Path to artifacts (videos, projections, etc) (as hdf5 files)      |
-| LOG_FILE         | Path to log file  |
-| PREDICTIONS_DIR         | Path to classifier predictions pre-labeling   |
-| PORT         | Port to run the app on   |
-| DEBUG         | Whether to enable debug mode (extra logging, etc)  |
-
 If you have not already created and populated your `SQLALCHEMY_DATABASE`, execute `python src/server/database/populate_labeling_job.py` to populate your database of labeling jobs.
 
 Execute `python src/server/main.py` to start the web server.

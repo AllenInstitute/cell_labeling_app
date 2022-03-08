@@ -456,6 +456,36 @@ class CellLabelingApp {
         $('#trim_video_to_timeframe').attr("disabled", true);
 
         $('#timestep_display').text('');
+
+        // Initialize contrast controls
+        const contrast = this.#getContrastValues();
+        this.#updateContrastControls(contrast);
+
+        // Update labeler stats
+        fetch(
+            `http://localhost:${PORT}/get_label_stats`
+        )
+            .then(data => data.json())
+            .then(stats => {
+                const total = stats['n_total'];
+                const completed = stats['n_completed'];
+                const userLabeled = stats['n_user_has_labeled'];
+                const numLabelersReqPerRegion = stats['num_labelers_required_per_region'];
+                let html = `
+                    <p>
+                        You have labeled
+                        <span>${userLabeled}</span> ${userLabeled.length > 1 ? 'regions' : 'region'}
+                        and there are <span>${total - userLabeled - completed}</span> remaining
+                    </p>`;
+                if (numLabelersReqPerRegion !== null) {
+                    html += `
+                        <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} people</p>
+                    `;
+                }
+                $('p#label_stats').html(html);
+            }
+        );
+
     }
 
     async loadNewRegion() {
@@ -467,6 +497,8 @@ class CellLabelingApp {
         const region = await this.getRandomRegionFromRandomExperiment()
             .then(region => {
                 this.is_loading_new_region = false;
+                $('#region_meta').html(
+                    `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
                 return region;
             })
             .catch(() => {
@@ -537,21 +569,26 @@ class CellLabelingApp {
         });
     }
 
-    updateProjectionContrast(low = 0.0, high = 1.0) {
-        $('input#projection_contrast_low_quantile').val(low);
-        $('input#projection_contrast_high_quantile').val(high);
+    updateProjectionContrast(low = null, high = null) {
+        low = parseFloat(low);
+        high = parseFloat(high);
+        const contrast = this.#getContrastValues(low, high);
+        const projection_type = $('#projection_type').children("option:selected").val();
+        Cookies.set('contrast', JSON.stringify({
+                ...JSON.parse(Cookies.get('contrast') ? Cookies.get('contrast') : null),
+                [projection_type]: contrast
+        }));
 
-        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${low}`);
-        $('#projection_contrast_high_quantile_label').text(`High quantile: ${high}`);
+        this.#updateContrastControls(contrast);
 
-        let x = clipImageToQuantiles(this.projection_raw, low, high);
+        let x = clipImageToQuantiles(this.projection_raw, contrast.low, contrast.high);
         x = scaleToUint8(x);
         x = toRGB(x);
 
         const trace1 = {
             z: x,
             type: 'image',
-            // disable hover tooltip 
+            // disable hover tooltip
             hoverinfo: 'none'
         };
 
@@ -560,8 +597,55 @@ class CellLabelingApp {
         Plotly.react('projection', [trace1], layout);
     }
 
+    #updateContrastControls(contrast) {
+        /* Updates the contrast controls. Contrast should be an object with
+        properties `low` and `high`. */
+        $('input#projection_contrast_low_quantile').val(contrast.low);
+        $('input#projection_contrast_high_quantile').val(contrast.high);
+
+        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${contrast.low}`);
+        $('#projection_contrast_high_quantile_label').text(`High quantile: ${contrast.high}`);
+    }
+
+    #getContrastValues(low = null, high = null) {
+        /* Tries to get contrast from cookie if a value for `low` and `high`
+        are not given. Otherwise returns default values.  */
+        let contrast;
+        const projection_type = $('#projection_type').children("option:selected").val();
+        if ((low === null && high === null) || (math.isNaN(low)) && math.isNaN(high)) {
+            contrast = this.#getSavedContrastValuesForProjectionType({projection_type});
+            if (contrast === null) {
+                contrast = {
+                    low: 0.0,
+                    high: 1.0
+                }
+            }
+        } else {
+            contrast = {
+                low,
+                high
+            }
+        }
+
+        return contrast;
+    }
+
+    #getSavedContrastValuesForProjectionType({projection_type}={}) {
+        /* Tries to get saved contrast values for a particular projection type.
+        Returns null if there are none.
+         */
+        let contrast = Cookies.get('contrast');
+        if (contrast !== undefined) {
+            contrast = JSON.parse(contrast);
+            if (contrast.hasOwnProperty(projection_type)) {
+                return contrast[projection_type];
+            }
+        }
+        return null;
+    }
+
     resetProjectionContrast() {
-        this.updateProjectionContrast();
+        this.updateProjectionContrast(0.0, 1.0);
     }
 
     async handleProjectionClick(x, y) {
@@ -857,9 +941,9 @@ class CellLabelingApp {
                 color: 'rgb(255, 255, 255)'
             },
             y0: this.region.x,
-            y1: this.region.x + this.region.width,
+            y1: this.region.x + this.region.height,
             x0: this.region.y,
-            x1: this.region.y + this.region.height
+            x1: this.region.y + this.region.width
         }
     }
 

@@ -19,6 +19,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/9.5.1/math.min.js" integrity="sha512-7+fUzDKxopLeVKiXTdoQQZBl6Zh9Bbl/NrZoowiddStpj7GXTUCM+LOPay4Wzxz14HazsoSsO96UFvvZqAH5rw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         <script id="MathJax-script" async
             src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
         <script>
             const PORT = "{{ port }}";
         </script>
@@ -48,6 +49,13 @@
             </div>
           </div>
         <div class="container app_container" id="app-container">
+            <div class="row" style="margin-top: 20px">
+                <p id="label_stats">
+                </p>
+            </div>
+            <div class="row">
+                <p id="region_meta" style="margin-top: 20px"></p>
+            </div>
             <div class="row">
                 <div class="col">
                     <div id="projection_container">
@@ -89,12 +97,12 @@
                                     <div class="form-group">
                                         <input type="range" id="projection_contrast_low_quantile" name="projection_contrast_low_quantile"
                                             min="0" max="0.5" value="0.0" step=".1" style="margin-top: 20px">
-                                        <label for="projection_contrast_low_quantile" id="projection_contrast_low_quantile_label" style="margin-left: 10px">Low quantile: 0.0</label>
+                                        <label for="projection_contrast_low_quantile" id="projection_contrast_low_quantile_label" style="margin-left: 10px"></label>
                                     </div>
                                     <div class="form-group">
                                         <input type="range" id="projection_contrast_high_quantile" name="projection_contrast_high_quantile"
                                             min="0.8" max="1" value="1.0" step=".01" style="margin-top: 20px">
-                                        <label for="projection_contrast_high_quantile" id="projection_contrast_high_quantile_label" style="margin-left: 10px">High quantile: 1.0</label>
+                                        <label for="projection_contrast_high_quantile" id="projection_contrast_high_quantile_label" style="margin-left: 10px"></label>
                                     </div>
                                     <button class="btn btn-light" id="projection_contrast_reset" style="margin-top: 10px">
                                         Reset
