@@ -72,9 +72,11 @@ class AppSchema(argschema.ArgSchema):
 
 
 class App(argschema.ArgSchemaParser):
+    """The main driver for the app."""
     default_schema = AppSchema
 
     def run(self):
+        """Launches webserver running app"""
         app = self._create_app()
         port = self.args['PORT']
 
@@ -85,6 +87,7 @@ class App(argschema.ArgSchemaParser):
             serve(app, port=port, threads=self.args['num_threads'])
 
     def _create_app(self):
+        """Creates a flask app"""
         template_dir = (
                     Path(__file__).parent.parent.parent / 'client').resolve()
         static_dir = template_dir
@@ -107,6 +110,7 @@ class App(argschema.ArgSchemaParser):
         return app
 
     def _create_backup_manager(self, app):
+        """Starts a backup manager running in the background in a new thread"""
         database_path = Path(self.args['database_path'])
         backup_manager = BackupManager(
             app=app,
