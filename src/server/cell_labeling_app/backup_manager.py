@@ -43,9 +43,10 @@ class BackupManager:
         with self._app.app_context():
             while True:
                 num_records = self._get_num_label_records()
-                logger.info(f'Current number of label records: {num_records}, '
-                            f'previous: {self._num_records}.')
                 if num_records > self._num_records:
+                    logger.info(
+                        f'Current number of label records: {num_records}, '
+                        f'previous: {self._num_records}.')
                     self._cleanup_backups()
                     self._make_backup()
                     self._num_records = num_records
