@@ -456,6 +456,10 @@ class CellLabelingApp {
         $('#trim_video_to_timeframe').attr("disabled", true);
 
         $('#timestep_display').text('');
+
+        // Initialize contrast controls
+        const contrast = this.#getContrastValues();
+        this.#updateContrastControls(contrast);
     }
 
     async loadNewRegion() {
@@ -540,9 +544,49 @@ class CellLabelingApp {
     }
 
     updateProjectionContrast(low = null, high = null) {
+        low = parseFloat(low);
+        high = parseFloat(high);
+        const contrast = this.#getContrastValues(low, high);
+        const projection_type = $('#projection_type').children("option:selected").val();
+        Cookies.set('contrast', JSON.stringify({
+                ...JSON.parse(Cookies.get('contrast')),
+                [projection_type]: contrast
+        }));
+
+        this.#updateContrastControls(contrast);
+
+        let x = clipImageToQuantiles(this.projection_raw, contrast.low, contrast.high);
+        x = scaleToUint8(x);
+        x = toRGB(x);
+
+        const trace1 = {
+            z: x,
+            type: 'image',
+            // disable hover tooltip
+            hoverinfo: 'none'
+        };
+
+        const layout = document.getElementById('projection').layout;
+
+        Plotly.react('projection', [trace1], layout);
+    }
+
+    #updateContrastControls(contrast) {
+        /* Updates the contrast controls. Contrast should be an object with
+        properties `low` and `high`. */
+        $('input#projection_contrast_low_quantile').val(contrast.low);
+        $('input#projection_contrast_high_quantile').val(contrast.high);
+
+        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${contrast.low}`);
+        $('#projection_contrast_high_quantile_label').text(`High quantile: ${contrast.high}`);
+    }
+
+    #getContrastValues(low = null, high = null) {
+        /* Tries to get contrast from cookie if a value for `low` and `high`
+        are not given. Otherwise returns default values.  */
         let contrast;
         const projection_type = $('#projection_type').children("option:selected").val();
-        if (low === null && high === null) {
+        if ((low === null && high === null) || (math.isNaN(low)) && math.isNaN(high)) {
             contrast = this.#getSavedContrastValuesForProjectionType({projection_type});
             if (contrast === null) {
                 contrast = {
@@ -555,33 +599,9 @@ class CellLabelingApp {
                 low,
                 high
             }
-
-            Cookies.set('contrast', JSON.stringify({
-                ...JSON.parse(Cookies.get('contrast')),
-                [projection_type]: contrast
-            }))
         }
 
-        $('input#projection_contrast_low_quantile').val(contrast.low);
-        $('input#projection_contrast_high_quantile').val(contrast.high);
-
-        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${contrast.low}`);
-        $('#projection_contrast_high_quantile_label').text(`High quantile: ${contrast.high}`);
-
-        let x = clipImageToQuantiles(this.projection_raw, contrast.low, contrast.high);
-        x = scaleToUint8(x);
-        x = toRGB(x);
-
-        const trace1 = {
-            z: x,
-            type: 'image',
-            // disable hover tooltip 
-            hoverinfo: 'none'
-        };
-
-        const layout = document.getElementById('projection').layout;
-
-        Plotly.react('projection', [trace1], layout);
+        return contrast;
     }
 
     #getSavedContrastValuesForProjectionType({projection_type}={}) {
