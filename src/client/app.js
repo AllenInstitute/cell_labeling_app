@@ -539,14 +539,36 @@ class CellLabelingApp {
         });
     }
 
-    updateProjectionContrast(low = 0.0, high = 1.0) {
-        $('input#projection_contrast_low_quantile').val(low);
-        $('input#projection_contrast_high_quantile').val(high);
+    updateProjectionContrast(low = null, high = null) {
+        let contrast;
+        const projection_type = $('#projection_type').children("option:selected").val();
+        if (low === null && high === null) {
+            contrast = this.#getSavedContrastValuesForProjectionType({projection_type});
+            if (contrast === null) {
+                contrast = {
+                    low: 0.0,
+                    high: 1.0
+                }
+            }
+        } else {
+            contrast = {
+                low,
+                high
+            }
 
-        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${low}`);
-        $('#projection_contrast_high_quantile_label').text(`High quantile: ${high}`);
+            Cookies.set('contrast', JSON.stringify({
+                ...JSON.parse(Cookies.get('contrast')),
+                [projection_type]: contrast
+            }))
+        }
 
-        let x = clipImageToQuantiles(this.projection_raw, low, high);
+        $('input#projection_contrast_low_quantile').val(contrast.low);
+        $('input#projection_contrast_high_quantile').val(contrast.high);
+
+        $('#projection_contrast_low_quantile_label').text(`Low quantile: ${contrast.low}`);
+        $('#projection_contrast_high_quantile_label').text(`High quantile: ${contrast.high}`);
+
+        let x = clipImageToQuantiles(this.projection_raw, contrast.low, contrast.high);
         x = scaleToUint8(x);
         x = toRGB(x);
 
@@ -562,8 +584,22 @@ class CellLabelingApp {
         Plotly.react('projection', [trace1], layout);
     }
 
+    #getSavedContrastValuesForProjectionType({projection_type}={}) {
+        /* Tries to get saved contrast values for a particular projection type.
+        Returns null if there are none.
+         */
+        let contrast = Cookies.get('contrast');
+        if (contrast !== undefined) {
+            contrast = JSON.parse(contrast);
+            if (contrast.hasOwnProperty(projection_type)) {
+                return contrast[projection_type];
+            }
+        }
+        return null;
+    }
+
     resetProjectionContrast() {
-        this.updateProjectionContrast();
+        this.updateProjectionContrast(0.0, 1.0);
     }
 
     async handleProjectionClick(x, y) {
