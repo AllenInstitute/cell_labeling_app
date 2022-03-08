@@ -14,7 +14,9 @@ from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import JobRegion, \
     UserLabels, UserRoiExtra
 from cell_labeling_app.util import util
-from cell_labeling_app.util.util import get_artifacts_path
+from cell_labeling_app.util.util import get_artifacts_path, \
+    get_user_has_labeled, get_completed_regions, \
+    get_total_regions_in_labeling_job
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from cell_labeling_app.util.util import get_next_region
 
@@ -342,6 +344,24 @@ def find_roi_at_coordinates():
 
     return {
         'roi_id': None
+    }
+
+
+@api.route('/get_label_stats', methods=['GET'])
+def get_label_stats():
+    """
+    Gets stats on user label counts, and num. remaining
+    :return:
+        Dict of stats
+    """
+    user_has_labeled = get_user_has_labeled()
+    completed = get_completed_regions()
+    total = get_total_regions_in_labeling_job()
+
+    return {
+        'n_user_has_labeled': len(user_has_labeled),
+        'n_total': total,
+        'n_completed': len(completed)
     }
 
 

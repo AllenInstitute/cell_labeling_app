@@ -43,4 +43,7 @@
     height: 80px;
     display: none;
 }
-  
+
+p#label_stats span {
+    font-weight: bold;
+}

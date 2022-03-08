@@ -460,6 +460,28 @@ class CellLabelingApp {
         // Initialize contrast controls
         const contrast = this.#getContrastValues();
         this.#updateContrastControls(contrast);
+
+        // Update labeler stats
+        fetch(
+            `http://localhost:${PORT}/get_label_stats`
+        )
+            .then(data => data.json())
+            .then(stats => {
+                const total = stats['n_total'];
+                const completed = stats['n_completed'];
+                const userLabeled = stats['n_user_has_labeled'];
+                $('p#label_stats').html(
+                    `<p>
+                        You have labeled
+                        <span>${userLabeled}</span> ${userLabeled.length > 1 ? 'regions' : 'region'}
+                        and there are <span>${total - userLabeled - completed}</span> remaining
+                    </p>
+
+                    <p>The labeling job is <span>${Math.round(completed / total * 100)}%</span> complete</p>`
+                );
+            }
+        );
+
     }
 
     async loadNewRegion() {

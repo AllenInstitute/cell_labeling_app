@@ -229,14 +229,13 @@ def get_artifacts_path(experiment_id: str):
     return artifact_path
 
 
-def _get_completed_regions(job_id: int) -> List[str]:
+def get_completed_regions() -> List[int]:
     """
     This returns the regions with sufficient number of labels
-    :param job_id
-        The job id
     :rtype: list of string
         list of completed region ids
     """
+    job_id = _get_current_job_id()
     region_label_counts = \
         (db.session
          .query(UserLabels.region_id,
@@ -255,19 +254,14 @@ def _get_completed_regions(job_id: int) -> List[str]:
     return regions_with_enough_labels
 
 
-def get_next_region() -> Optional[JobRegion]:
-    """Samples a region randomly from a set of candidate regions.
-    The candidate regions are those that have not already been labeled by the
-    labeler and those that have not been labeled enough times by other
-    labelers
-    :rtype: optional JobRegion
-        JobRegion, if a candidate region exists, otherwise None
+def get_user_has_labeled() -> List[int]:
     """
-    # job id is most recently created job id
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).first()[0]
+    Gets the list of region ids that the current user has labeled
+    :return:
+        List of region ids
+    """
+    job_id = _get_current_job_id()
 
-    # Get all region ids user has labeled
     user_has_labeled = \
         (db.session
          .query(UserLabels.region_id)
@@ -276,9 +270,24 @@ def get_next_region() -> Optional[JobRegion]:
                  UserLabels.user_id == current_user.get_id())
          .all())
     user_has_labeled = [region.region_id for region in user_has_labeled]
+    return user_has_labeled
+
+
+def get_next_region() -> Optional[JobRegion]:
+    """Samples a region randomly from a set of candidate regions.
+    The candidate regions are those that have not already been labeled by the
+    labeler and those that have not been labeled enough times by other
+    labelers
+    :rtype: optional JobRegion
+        JobRegion, if a candidate region exists, otherwise None
+    """
+    job_id = _get_current_job_id()
+
+    # Get all region ids user has labeled
+    user_has_labeled = get_user_has_labeled()
 
     if current_app.config['LABELS_PER_REGION_LIMIT'] is not None:
-        regions_with_enough_labels = _get_completed_regions(job_id=job_id)
+        regions_with_enough_labels = get_completed_regions()
         exclude_regions = user_has_labeled + regions_with_enough_labels
     else:
         exclude_regions = user_has_labeled
@@ -302,3 +311,29 @@ def get_next_region() -> Optional[JobRegion]:
     else:
         next_region = random.choice(next_region_candidates)
     return next_region
+
+
+def _get_current_job_id() -> int:
+    """
+    Gets the current job id, where current is the most recently made
+    :return:
+        job id
+    """
+    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
+        LabelingJob.date)).first()[0]
+    return job_id
+
+
+def get_total_regions_in_labeling_job() -> int:
+    """
+    Gets the total number of regions in the labeling job
+    :return:
+        total number of regions in labeling job
+    """
+    job_id = _get_current_job_id()
+    n = (db.session
+         .query(JobRegion)
+         .filter(JobRegion.job_id == job_id)
+         .count()
+         )
+    return n
