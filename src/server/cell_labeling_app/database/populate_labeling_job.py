@@ -335,8 +335,6 @@ if __name__ == '__main__':
         parser.add_argument('--database_path', required=True,
                             help='Path to where the database should get '
                                  'created')
-        parser.add_argument('--config_path', required=True,
-                            help='Path to app config')
         parser.add_argument('--n',
                             help='Number of experiments to include in the '
                                  'labeling job',
@@ -400,8 +398,6 @@ if __name__ == '__main__':
                              "experiment is provided. Please specify one or "
                              "the other. Exiting.")
 
-        n = int(args.n)
-
         artifacts_dir = Path(args.artifact_files_dir)
         database_path = Path(args.database_path)
 
@@ -416,10 +412,10 @@ if __name__ == '__main__':
                  f'@{args.LIMS_host}:{args.LIMS_port}/{args.LIMS_database}'
 
         sampler = RegionSampler(
-            num_experiments=n,
+            num_experiments=args.n,
             db_url=db_url,
             num_regions_per_exp=args.n_regions_per_exp,
-            selected_experiments=args.external_experiment_ids,
+            selected_experiments_path=args.external_experiment_ids,
             fov_divisor=args.fov_divisor,
             artifact_path=artifacts_dir,
             seed=args.seed)
