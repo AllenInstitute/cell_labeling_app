@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import flask
+import numpy as np
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import UserLabels
 
@@ -39,7 +40,7 @@ class BackupManager:
     def run(self):
         """Checks to see if there have been new labels added since last time.
         If so, deletes previous backup and writes new one.
-        Checks if self._frequency seconds"""
+        Checks every self._frequency seconds"""
         with self._app.app_context():
             while True:
                 num_records = self._get_num_label_records()
@@ -47,8 +48,8 @@ class BackupManager:
                     logger.info(
                         f'Current number of label records: {num_records}, '
                         f'previous: {self._num_records}.')
-                    self._cleanup_backups()
                     self._make_backup()
+                    self._cleanup_backups()
                     self._num_records = num_records
                 time.sleep(self._frequency)
 
@@ -58,9 +59,21 @@ class BackupManager:
         shutil.copy(self._database_path, backup_path)
         logger.info(f'Created new backup {backup_path}')
 
-    def _cleanup_backups(self):
-        for file in os.listdir(self._backup_dir):
-            os.remove(self._backup_dir / file)
+    def _cleanup_backups(self, retention_count: int = 1):
+        """
+        Deletes old backups
+
+        :param retention_count:
+            The number of backups to retain
+        :return:
+            None, deletes files inplace
+        """
+        backups = os.listdir(self._backup_dir)
+        mod_times = [os.path.getmtime(self._backup_dir / file)
+                     for file in backups]
+        backups_idx_by_time = np.argsort(mod_times)
+        for idx in backups_idx_by_time[:-retention_count]:
+            os.remove(self._backup_dir / backups[idx])
 
     @staticmethod
     def _get_num_label_records():
