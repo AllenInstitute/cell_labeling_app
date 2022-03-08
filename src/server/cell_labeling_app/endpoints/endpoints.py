@@ -243,7 +243,7 @@ def get_fov_bounds():
     y_range = [
         # Reversing because origin of plot is top-left instead of bottom-left
         max(float(y_max), region.x + region.height),
-        min(float(y_min), region.y)
+        min(float(y_min), region.x)
     ]
 
     return {
