@@ -17,9 +17,12 @@ class JobRegion(db.Model):
     job_id = db.Column(db.Integer, db.ForeignKey(LabelingJob.job_id))
     experiment_id = db.Column(db.String, nullable=False)
 
-    # Upper left of the region in the field of view coordinates
-    x = db.Column(db.Integer, nullable=False)
-    y = db.Column(db.Integer, nullable=False)
+    x = db.Column(db.Integer, nullable=False,
+                  doc='Row index in array coordinates of the region upper '
+                      'left')
+    y = db.Column(db.Integer, nullable=False,
+                  doc='Column index in array coordinates of the region upper '
+                      'left')
 
     # Width and height of the region
     width = db.Column(db.Integer, nullable=False)
@@ -46,6 +49,8 @@ class UserLabels(db.Model):
     labels = db.Column(db.String, primary_key=True)
 
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    duration = db.Column(db.Float, doc='The amount of time it took to label '
+                                       'in seconds')
 
 
 class UserRoiExtra(db.Model):

@@ -270,7 +270,8 @@ def submit_region():
 
     # add labels
     user_labels = UserLabels(user_id=user_id, region_id=data['region_id'],
-                             labels=json.dumps(data['labels']))
+                             labels=json.dumps(data['labels']),
+                             duration=data['duration'])
     db.session.add(user_labels)
 
     # add roi extra
