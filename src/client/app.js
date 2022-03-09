@@ -474,12 +474,12 @@ class CellLabelingApp {
                 let html = `
                     <p>
                         You have labeled
-                        <span>${userLabeled}</span> ${userLabeled.length > 1 ? 'regions' : 'region'}
+                        <span>${userLabeled}</span> ${userLabeled > 1 ? 'regions' : 'region'}
                         and there are <span>${total - userLabeled - completed}</span> remaining
                     </p>`;
                 if (numLabelersReqPerRegion !== null) {
                     html += `
-                        <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} people</p>
+                        <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} labelers</p>
                     `;
                 }
                 $('p#label_stats').html(html);
