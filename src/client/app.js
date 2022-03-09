@@ -477,7 +477,7 @@ class CellLabelingApp {
                         <span>${userLabeled}</span> ${userLabeled > 1 ? 'regions' : 'region'}
                         and there are <span>${total - userLabeled - completed}</span> remaining
                     </p>`;
-                if (numLabelersReqPerRegion !== null) {
+                if (numLabelersReqPerRegion > 1) {
                     html += `
                         <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} labelers</p>
                     `;

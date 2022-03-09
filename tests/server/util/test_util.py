@@ -24,7 +24,7 @@ class TestGetNextRegion:
 
         app = Flask(__name__)
         app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_fp.name}'
-        app.config['LABELS_PER_REGION_LIMIT'] = labels_per_region_limit
+        app.config['LABELERS_REQUIRED_PER_REGION'] = labels_per_region_limit
         db.init_app(app)
         with app.app_context():
             db.create_all()

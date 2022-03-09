@@ -249,7 +249,7 @@ def get_completed_regions() -> List[int]:
     regions_with_enough_labels = \
         region_label_counts.loc[
             region_label_counts['count'] >=
-            current_app.config['LABELS_PER_REGION_LIMIT'],
+            current_app.config['LABELERS_REQUIRED_PER_REGION'],
             'region_id'].tolist()
     return regions_with_enough_labels
 
@@ -286,11 +286,8 @@ def get_next_region() -> Optional[JobRegion]:
     # Get all region ids user has labeled
     user_has_labeled = get_user_has_labeled()
 
-    if current_app.config['LABELS_PER_REGION_LIMIT'] is not None:
-        regions_with_enough_labels = get_completed_regions()
-        exclude_regions = user_has_labeled + regions_with_enough_labels
-    else:
-        exclude_regions = user_has_labeled
+    regions_with_enough_labels = get_completed_regions()
+    exclude_regions = user_has_labeled + regions_with_enough_labels
 
     # Get initial next region candidates query
     next_region_candidates = \

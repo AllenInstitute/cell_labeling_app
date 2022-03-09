@@ -47,14 +47,10 @@ class AppSchema(argschema.ArgSchema):
         required=True,
         description='Path to where logs should be written'
     )
-    LABELS_PER_REGION_LIMIT = argschema.fields.Integer(
+    LABELERS_REQUIRED_PER_REGION = argschema.fields.Integer(
         default=3,
-        allow_none=True,
-        description='Limits the number of labelers who need to label a region '
-                    'to mark it "complete". Once it is "complete" it is not '
-                    'shown to other labelers. If None, a region will be shown '
-                    'to all labelers regardless of the number of times it has '
-                    'been labeled. '
+        description='Requires a certain number of labelers to label a region '
+                    'until it is no longer shown to other labelers.'
     )
     debug = argschema.fields.Boolean(
         default=False,

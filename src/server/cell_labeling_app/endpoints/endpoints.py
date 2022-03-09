@@ -363,7 +363,7 @@ def get_label_stats():
         'n_total': total,
         'n_completed': len(completed),
         'num_labelers_required_per_region':
-            current_app.config['LABELS_PER_REGION_LIMIT']
+            current_app.config['LABELERS_REQUIRED_PER_REGION']
     }
 
 
