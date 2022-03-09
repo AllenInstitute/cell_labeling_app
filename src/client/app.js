@@ -446,6 +446,7 @@ class CellLabelingApp {
         this.is_loading_new_region = false;
         this.selected_roi = null;
         this.notes = new Map();
+        this.labelingStart = Date.now();
         this.resetSideNav();
 
         $('button#submit_labels').attr('disabled', true);
@@ -541,7 +542,8 @@ class CellLabelingApp {
                             label: x.label
                         }
                     }),
-            roi_extra
+            roi_extra,
+            duration: (Date.now() - this.labelingStart) / 1000
         };
         return $.post(url, JSON.stringify(data))
             .then(() => {
