@@ -17,7 +17,7 @@ python setup.py install
 
 If you have not already created and populated your `SQLALCHEMY_DATABASE`, execute `python src/server/database/populate_labeling_job.py` to populate your database of labeling jobs.
 
-Execute `python src/server/main.py` to start the web server.
+Execute `python -m cell_labeling_app.main --input_json <path to app input json>` to start the web server.
 
 3. If this computer does not have access to a browser, then you need to tunnel to port `<PORT>` on a computer that does.
 On linux the command is 
