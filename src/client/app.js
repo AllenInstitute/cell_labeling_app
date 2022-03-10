@@ -475,7 +475,7 @@ class CellLabelingApp {
                 let html = `
                     <p>
                         You have labeled
-                        <span>${userLabeled}</span> ${userLabeled > 1 ? 'regions' : 'region'}
+                        <span>${userLabeled}</span> ${userLabeled > 1 || userLabeled === 0 ? 'regions' : 'region'}
                         and there are <span>${total - userLabeled - completed}</span> remaining
                     </p>`;
                 if (numLabelersReqPerRegion > 1) {
