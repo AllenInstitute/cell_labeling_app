@@ -109,13 +109,13 @@ class App(argschema.ArgSchemaParser):
 
     def run_production_server(self):
         """Launches webserver running app"""
-        num_workers = 1 if self.args['debug'] else self.args['num_workers']
         gunicorn_cmd_args = [
             f'--bind=localhost:{self.args["PORT"]}',
-            f'--workers={num_workers}',
+            f'--workers={self.args["num_workers"]}',
             '--capture-output',
             '--name=cell_labeling_app',
-            '--timeout=0']
+            '--timeout=90'
+        ]
         if self.args['ACCESS_LOG_FILE'] is not None:
             gunicorn_cmd_args.append(
                 f'--access-logfile {self.args["ACCESS_LOG_FILE"]}')
