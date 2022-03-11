@@ -7,7 +7,7 @@ Pillow~=8.4.0
 Flask~=2.0.2
 Flask-SQLAlchemy
 Flask-Login
-waitress~=2.0.0
+gunicorn
 SQLAlchemy~=1.4.26
 pytest~=6.2.5
 git+https://github.com/AllenInstitute/ophys_etl_pipelines@main

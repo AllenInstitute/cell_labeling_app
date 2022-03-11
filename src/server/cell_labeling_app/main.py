@@ -1,4 +1,7 @@
-import logging
+import json
+import os
+import subprocess
+import sys
 import threading
 import uuid
 from pathlib import Path
@@ -44,8 +47,14 @@ class AppSchema(argschema.ArgSchema):
         description='Field of view dimensions'
     )
     LOG_FILE = argschema.fields.OutputFile(
-        required=True,
-        description='Path to where logs should be written'
+        default=None,
+        allow_none=True,
+        description='Path to where stdout/stderr logs should be written'
+    )
+    ACCESS_LOG_FILE = argschema.fields.OutputFile(
+        default=None,
+        allow_none=True,
+        description='Path to where access logs should be written'
     )
     LABELERS_REQUIRED_PER_REGION = argschema.fields.Integer(
         default=3,
@@ -57,9 +66,9 @@ class AppSchema(argschema.ArgSchema):
         description='Whether to enable debug mode (more logging, '
                     'autoreload of server on code change)'
     )
-    num_threads = argschema.fields.Integer(
-        default=16,
-        description='Number of threads to use for the webserver'
+    num_workers = argschema.fields.Integer(
+        default=32,
+        description='Number of workers to use for the webserver'
     )
     backup_params = argschema.fields.Nested(
         _BackupSchema,
@@ -71,19 +80,12 @@ class App(argschema.ArgSchemaParser):
     """The main driver for the app."""
     default_schema = AppSchema
 
-    def run(self):
-        """Launches webserver running app"""
-        app = self._create_app()
-        port = self.args['PORT']
+    def create_flask_app(self, session_secret_key: str) -> Flask:
+        """Creates a flask app
+        :param session_secret_key: A session secret key for authentication
+        :return: instantiated flask app
 
-        if self.args['debug']:
-            app.run(debug=True, port=port)
-        else:
-            from waitress import serve
-            serve(app, port=port, threads=self.args['num_threads'])
-
-    def _create_app(self):
-        """Creates a flask app"""
+        """
         template_dir = (
                     Path(__file__).parent.parent.parent / 'client').resolve()
         static_dir = template_dir
@@ -92,7 +94,7 @@ class App(argschema.ArgSchemaParser):
         app.config['SQLALCHEMY_DATABASE_URI'] = \
             f'sqlite:///{self.args["database_path"]}'
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        app.config['SESSION_SECRET_KEY'] = str(uuid.uuid4())
+        app.config['SESSION_SECRET_KEY'] = session_secret_key
         app.register_blueprint(api)
         for k, v in self.args.items():
             app.config[k] = v
@@ -104,6 +106,37 @@ class App(argschema.ArgSchemaParser):
         self._create_backup_manager(app)
 
         return app
+
+    def run_production_server(self):
+        """Launches webserver running app"""
+        num_workers = 1 if self.args['debug'] else self.args['num_workers']
+        gunicorn_cmd_args = [
+            f'--bind=localhost:{self.args["PORT"]}',
+            f'--workers={num_workers}',
+            '--capture-output',
+            '--name=cell_labeling_app',
+            '--timeout=0']
+        if self.args['ACCESS_LOG_FILE'] is not None:
+            gunicorn_cmd_args.append(
+                f'--access-logfile {self.args["ACCESS_LOG_FILE"]}')
+
+        if self.args['LOG_FILE'] is not None:
+            gunicorn_cmd_args.append(f'--log-file {self.args["LOG_FILE"]}')
+
+        if self.args['debug']:
+            gunicorn_cmd_args.append('--reload')
+
+        os.environ['GUNICORN_CMD_ARGS'] = ' '.join(gunicorn_cmd_args)
+        input_json_path = sys.argv[-1]
+        session_secret_key = str(uuid.uuid4())
+        cmd = ['gunicorn',
+               f'src.server.cell_labeling_app.main:main('
+               f'input_json_path="{input_json_path}", '
+               f'session_secret_key="{session_secret_key}")']
+
+        subprocess.run(cmd, stdout=sys.stdout,
+                       stderr=sys.stderr,
+                       env=os.environ)
 
     def _create_backup_manager(self, app):
         """Starts a backup manager running in the background in a new thread"""
@@ -118,16 +151,18 @@ class App(argschema.ArgSchemaParser):
         t.start()
 
 
+def main(input_json_path: str, session_secret_key: str) -> Flask:
+    with open(input_json_path) as f:
+        input_data = json.load(f)
+    app = App(input_data=input_data, args=[])
+    app = app.create_flask_app(session_secret_key=session_secret_key)
+    return app
+
+
 if __name__ == '__main__':
     app = App()
-
-    log_level = logging.DEBUG if app.args['debug'] else logging.INFO
-    logging.basicConfig(
-        filename=app.args['LOG_FILE'],
-        level=log_level,
-        format='%(name)s: %(asctime)s %(levelname)-8s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        force=True
-    )
-
-    app.run()
+    if app.args['debug']:
+        app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))
+        app.run(debug=True, port=app.args['PORT'])
+    else:
+        app.run_production_server()
