@@ -8,7 +8,7 @@ from PIL import Image
 from flask import render_template, request, send_file, Blueprint, \
     current_app, Request
 from flask_login import current_user
-from ophys_etl.roi_cell_classifier.video_utils import (
+from ophys_etl.modules.roi_cell_classifier.video_utils import (
     get_thumbnail_video_from_artifact_file)
 
 from cell_labeling_app.database.database import db
