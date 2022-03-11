@@ -8,7 +8,8 @@ from PIL import Image
 from flask import render_template, request, send_file, Blueprint, \
     current_app, Request
 from flask_login import current_user
-from ophys_etl.utils.thumbnail_video_generator import VideoGenerator
+from ophys_etl.roi_cell_classifier.video_utils import (
+    get_thumbnail_video_from_artifact_file)
 
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import JobRegion, \
@@ -148,9 +149,6 @@ def get_video():
 
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    af = ArtifactFile(path=artifact_path)
-    video_generator = VideoGenerator(video_data=af.video)
-
     region = (db.session.query(JobRegion)
               .filter(JobRegion.id == region_id)
               .first())
@@ -183,8 +181,9 @@ def get_video():
 
     roi_list = rois if include_all_roi_masks else None
 
-    video = video_generator.get_thumbnail_video_from_roi(
-        this_roi,
+    video = get_thumbnail_video_from_artifact_file(
+        artifact_path=artifact_path,
+        roi=this_roi,
         padding=padding,
         quality=9,
         timesteps=timesteps,
