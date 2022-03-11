@@ -59,11 +59,6 @@ class ArtifactFile:
         return self._path.name.split('_')[0]
 
     @property
-    def video(self) -> np.ndarray:
-        with h5py.File(self._path, 'r') as f:
-            return f['video_data'][()]
-
-    @property
     def rois(self) -> List[dict]:
         with h5py.File(self._path, 'r') as f:
             return json.loads((f['rois'][()]))
