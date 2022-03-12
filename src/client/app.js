@@ -117,7 +117,9 @@ class CellLabelingApp {
                     title: 'Timestep'
                 },
                 yaxis: {
-                    title: 'Trace magnitude'
+                    title: 'Trace magnitude',
+                    // Prevent zoom event on y axis
+                    fixedrange: true
                 }
             }
 
