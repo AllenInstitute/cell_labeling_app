@@ -13,7 +13,8 @@ import {
 
 class CellLabelingApp {
     /* Main App class */
-    constructor() {
+    constructor({field_of_view_dims}={}) {
+        this.fieldOfViewDims = field_of_view_dims;
         this.displayLoginMessage();
         this.addListeners();
     }
@@ -492,7 +493,6 @@ class CellLabelingApp {
                 $('p#label_stats').html(html);
             }
         );
-
     }
 
     async loadNewRegion() {
@@ -502,10 +502,13 @@ class CellLabelingApp {
         $('#loading_text').css('display', 'inline');
 
         const region = await this.getRandomRegionFromRandomExperiment()
-            .then(region => {
+            .then(async region => {
                 this.is_loading_new_region = false;
                 $('#region_meta').html(
                     `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
+                this.motionBorder = await fetch(
+            `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
+                ).then(data => data.json());
                 return region;
             })
             .catch(() => {
@@ -956,16 +959,7 @@ class CellLabelingApp {
     }
 
     async getMotionBorderShape() {
-        const field_of_view_dims = await fetch(
-            `http://localhost:${PORT}/get_field_of_view_dimensions`
-        )
-            .then(data => data.json())
-            .then(data => data['field_of_view_dimensions']);
-
-        const mb = await fetch(
-            `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
-        )
-            .then(data => data.json())
+        const mb = this.motionBorder;
         const sides = ['left_side', 'right_side', 'top', 'bottom'];
 
         return sides.map(side => {
@@ -973,22 +967,22 @@ class CellLabelingApp {
             if (side === 'left_side' || side === 'right_side') {
                 let offset = mb[side];
                 if (side === 'right_side') {
-                    offset = field_of_view_dims[0] - offset;
+                    offset = this.fieldOfViewDims[0] - offset;
                 }
                 x0 = offset;
                 y0 = 0;
 
-                y1 = field_of_view_dims[1];
+                y1 = this.fieldOfViewDims[1];
                 x1 = offset;
             } else {
                 let offset = mb[side];
                 if (side === 'bottom') {
-                    offset = field_of_view_dims[1] - offset;
+                    offset = this.fieldOfViewDims[1] - offset;
                 }
                 x0 = 0;
                 y0 = offset;
 
-                x1 = field_of_view_dims[0];
+                x1 = this.fieldOfViewDims[0];
                 y1 = offset;
             }
 
@@ -1031,7 +1025,17 @@ class CellLabelingApp {
     }
 }
 
+const getFieldOfViewDimensions = async function() {
+        const field_of_view_dims = await fetch(
+            `http://localhost:${PORT}/get_field_of_view_dimensions`
+        )
+            .then(data => data.json())
+            .then(data => data['field_of_view_dimensions']);
+        return field_of_view_dims;
+    }
+
 $(document).ready(async function () {
-    const app = new CellLabelingApp();
+    const field_of_view_dims = await getFieldOfViewDimensions();
+    const app = new CellLabelingApp({field_of_view_dims});
     app.loadNewRegion();
 });
