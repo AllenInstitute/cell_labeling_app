@@ -123,7 +123,11 @@ class CellLabelingApp {
                 }
             }
 
-            Plotly.newPlot('trace', [trace], layout);
+            const config = {
+                responsive: true
+            }
+
+            Plotly.newPlot('trace', [trace], layout, config);
 
             this.is_trace_shown = true;
 
