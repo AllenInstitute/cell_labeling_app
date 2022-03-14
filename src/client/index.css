@@ -15,7 +15,10 @@
 /* Style page content */
 .app_container {
     margin-left: 400px; /* Same as the width of the sidebar */
+    width: calc(100% - 400px);
+    overflow-x: hidden; !important;
   }
+
 
 .sidenav .sidenav-section h3{
     background-color: rgb(223, 223, 223);

@@ -162,7 +162,7 @@ def main(input_json_path: str, session_secret_key: str) -> Flask:
 if __name__ == '__main__':
     app = App()
     if app.args['debug']:
-        app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))
-        app.run(debug=True, port=app.args['PORT'])
+        flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))
+        flask_app.run(debug=True, port=app.args['PORT'])
     else:
         app.run_production_server()
