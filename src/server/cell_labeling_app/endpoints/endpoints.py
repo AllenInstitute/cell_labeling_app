@@ -414,3 +414,18 @@ def _create_circle_mask_for_nonsegmented_point(
     center_x, center_y = point
     return x[center_y - radius:center_y + radius+1,
              center_x - radius:center_x + radius+1].astype(bool).tolist()
+
+
+@api.route('/get_user_submitted_labels')
+def get_user_submitted_labels():
+    labels = get_user_has_labeled()
+    labels = [
+        {
+            'submitted': r['submitted'],
+            'experiment_id': r['experiment_id'],
+            'region_id': r['region_id']
+        } for r in labels]
+    return {
+        'labels': labels
+    }
+

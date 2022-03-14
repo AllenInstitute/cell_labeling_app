@@ -47,6 +47,14 @@
     display: none;
 }
 
-p#label_stats span {
+span.label_stats {
     font-weight: bold;
+}
+
+#submitted-regions-table td {
+    font-size: 14px;
+}
+
+#submitted-regions-table tbody tr {
+    cursor: pointer;
 }

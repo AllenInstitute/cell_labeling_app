@@ -89,7 +89,7 @@ function displayTemporaryAlert({msg, type, showTime = 5000} = {}) {
             ${msg}
         </div>`;
     alert = $(alert);
-    $('#app-container').prepend(alert);
+    $('#alert-container').html(alert);
     setTimeout(() => $('#alert').alert('close'), showTime);
 }
 

@@ -468,56 +468,37 @@ class CellLabelingApp {
         // Initialize contrast controls
         const contrast = this.#getContrastValues();
         this.#updateContrastControls(contrast);
-
-        // Update labeler stats
-        fetch(
-            `http://localhost:${PORT}/get_label_stats`
-        )
-            .then(data => data.json())
-            .then(stats => {
-                const total = stats['n_total'];
-                const completed = stats['n_completed'];
-                const userLabeled = stats['n_user_has_labeled'];
-                const numLabelersReqPerRegion = stats['num_labelers_required_per_region'];
-                let html = `
-                    <p>
-                        You have labeled
-                        <span>${userLabeled}</span> ${userLabeled > 1 || userLabeled === 0 ? 'regions' : 'region'}
-                        and there are <span>${total - userLabeled - completed}</span> remaining
-                    </p>`;
-                if (numLabelersReqPerRegion > 1) {
-                    html += `
-                        <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} labelers</p>
-                    `;
-                }
-                $('p#label_stats').html(html);
-            }
-        );
     }
 
-    async loadNewRegion() {
+    async loadNewRegion(region_id = null) {
         $('#movie').remove();
         this.initialize();
-        this.is_loading_new_region = true;
         $('#loading_text').css('display', 'inline');
 
-        const region = await this.getRandomRegionFromRandomExperiment()
-            .then(async region => {
-                this.is_loading_new_region = false;
-                $('#region_meta').html(
-                    `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
-                this.motionBorder = await fetch(
-            `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
-                ).then(data => data.json());
-                return region;
-            })
-            .catch(() => {
-                $('#loading_text').hide();
-                displayTemporaryAlert({
-                    msg: 'Error loading region',
-                    type: 'danger'
-                });
+        let region;
+        try {
+            if (region_id === null) {
+                this.#populateSubmittedRegionsTable();
+                region = await this.getRandomRegionFromRandomExperiment();
+            } else {
+                // todo
+                region = null;
+            }
+        } catch (e) {
+            $('#loading_text').hide();
+            displayTemporaryAlert({
+                msg: 'Error loading region',
+                type: 'danger'
             });
+            return;
+        }
+
+        $('#region_meta').html(
+            `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
+        this.motionBorder = await fetch(
+        `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
+        ).then(data => data.json());
+
         if (region['region'] !== null) {
             return this.displayArtifacts().then(() => {
                 $('button#submit_labels').attr('disabled', false);
@@ -555,9 +536,28 @@ class CellLabelingApp {
             duration: (Date.now() - this.labelingStart) / 1000
         };
         return $.post(url, JSON.stringify(data))
-            .then(() => {
+            .then(async () => {
+                // Update labeler stats
+                const statsHtml = await fetch(
+                    `http://localhost:${PORT}/get_label_stats`
+                )
+                    .then(data => data.json())
+                    .then(stats => {
+                        const total = stats['n_total'];
+                        const completed = stats['n_completed'];
+                        const userLabeled = stats['n_user_has_labeled'];
+                        const html = `
+                            <p>
+                                You have labeled
+                                <span class="label_stats">${userLabeled}</span> ${userLabeled > 1 || userLabeled === 0 ? 'regions' : 'region'}
+                                and there are <span class="label_stats">${total - userLabeled - completed}</span> remaining
+                            </p>`;
+                        return html;
+                    }
+                );
+                const msg = `Successfully submitted labels for region<br>Loading next region<br>${statsHtml}`;
                 displayTemporaryAlert({
-                    msg: 'Successfully submitted labels for region<br>Loading next region',
+                    msg,
                     type: 'success'
                 });
             })
@@ -1022,6 +1022,69 @@ class CellLabelingApp {
         const shapes = [...contours, ...points, regionBoundary,
             ...motionBorder];
         Plotly.relayout('projection', {'shapes': shapes});
+    }
+
+    async #populateSubmittedRegionsTable() {
+        const labels = await fetch('/get_user_submitted_labels')
+            .then(res => res.json())
+            .then(res => res['labels']);
+        labels.forEach(l => {
+            l.submitted = new Date(l.submitted).toLocaleString();
+        });
+        const tableRowsHtml = labels.map(l => {
+            return `
+                <tr>
+                    <td>
+                        ${l.submitted}
+                    </td>
+                    <td>
+                        ${l.experiment_id}
+                    </td>
+                    <td>
+                        ${l.region_id}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        $('#regions-table-container').html(`
+            <script>
+                function datesSorter(a, b) {
+                    return Date.parse(a) - Date.parse(b);
+                }
+            </script>
+            <table id="submitted-regions-table" data-height="300" data-toggle="table">
+                <thead>
+                    <tr>
+                        <th data-field="submitted" data-sortable="true" data-sorter="datesSorter">Submitted</th>
+                        <th data-field="experiment_id">Exp. ID</th>
+                        <th data-field="region_id" >Region ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                ${tableRowsHtml}
+                </tbody>
+            </table>`);
+        $('#submitted-regions-table').bootstrapTable();
+        $('#submitted-regions-table tbody tr').click(event => {
+            this.#handleSubmittedRegionsTableCLick(event);
+        });
+    }
+
+    #handleSubmittedRegionsTableCLick(row) {
+        const headers = [];
+        $(row.target).parent().parent().parent().find('th').each(function() {
+            headers.push($(this).attr('data-field'));
+        });
+
+        const rowValues = [];
+        $(row.target).closest('tr').find('td').each(function() {
+            rowValues.push($(this).text());
+        });
+
+        // highlight selected row
+        $(row.target).closest('tr').addClass('table-primary').siblings().removeClass('table-primary');
+
+        const region_id = rowValues[headers.indexOf('region_id')];
     }
 }
 

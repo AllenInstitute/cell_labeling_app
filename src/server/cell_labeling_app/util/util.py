@@ -254,22 +254,35 @@ def get_completed_regions() -> List[int]:
     return regions_with_enough_labels
 
 
-def get_user_has_labeled() -> List[int]:
+def get_user_has_labeled() -> List[Dict]:
     """
     Gets the list of region ids that the current user has labeled
     :return:
-        List of region ids
+        List of dict with keys
+            submitted: datetime label submitted
+            region_id
+            experiment_id
     """
+    # 'x': next_region.x,
+    # 'y': next_region.y,
+    # 'width': next_region.width,
+    # 'height': next_region.height
     job_id = _get_current_job_id()
 
     user_has_labeled = \
         (db.session
-         .query(UserLabels.region_id)
+         .query(UserLabels.timestamp.label('submitted'),
+                JobRegion.id.label('region_id'),
+                JobRegion.experiment_id,
+                JobRegion.x,
+                JobRegion.y,
+                JobRegion.width,
+                JobRegion.height)
          .join(JobRegion, JobRegion.id == UserLabels.region_id)
          .filter(JobRegion.job_id == job_id,
                  UserLabels.user_id == current_user.get_id())
+         .order_by(UserLabels.timestamp.desc())
          .all())
-    user_has_labeled = [region.region_id for region in user_has_labeled]
     return user_has_labeled
 
 
@@ -285,6 +298,7 @@ def get_next_region() -> Optional[JobRegion]:
 
     # Get all region ids user has labeled
     user_has_labeled = get_user_has_labeled()
+    user_has_labeled = [region['region_id'] for region in user_has_labeled]
 
     regions_with_enough_labels = get_completed_regions()
     exclude_regions = user_has_labeled + regions_with_enough_labels
