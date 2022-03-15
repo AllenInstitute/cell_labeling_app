@@ -373,6 +373,7 @@ def get_labels_for_region(region_id: int) -> List[dict]:
         (db.session
          .query(UserLabels.labels)
          .filter(UserLabels.region_id == region_id)
+         .filter(UserLabels.user_id == current_user.get_id())
          .first())
     labels = json.loads(labels[0])
     return labels
