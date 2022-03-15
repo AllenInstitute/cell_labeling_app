@@ -446,3 +446,13 @@ def get_labels_for_region():
     return {
         'labels': labels
     }
+
+
+@api.route('/update_labels_for_region', methods=['POST'])
+def update_labels_for_region():
+    data = request.get_json(force=True)
+    util.update_labels_for_region(region_id=data['region_id'],
+                                  labels=data['labels'])
+    util.update_roi_extra_for_region(region_id=data['region_id'],
+                                     roi_extra=data['roi_extra'])
+    return 'success'

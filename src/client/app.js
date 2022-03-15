@@ -47,6 +47,10 @@ class CellLabelingApp {
             this.handleSubmitRegion();
         });
 
+        $('button#update_labels').on('click', () => {
+            this.handleSubmitRegion({isUpdate: true});
+        });
+
         $('input#projection_contrast_low_quantile, input#projection_contrast_high_quantile').on('input', () => {
             const low = $('input#projection_contrast_low_quantile').val();
             const high = $('input#projection_contrast_high_quantile').val()
@@ -452,6 +456,18 @@ class CellLabelingApp {
     }
 
     async loadNewRegion(region_id = null) {
+        /* Loads a new region
+
+        Args
+        ------
+        - region_id:
+            Load a specific region.
+        */
+        if (!region_id) {
+            // If region id is not passed, we should be submitting,
+            // rather than updating
+            $('#submit_labels').show();
+        }
         $('#projection-spinner').show();
         $('#movie').remove();
         this.initialize();
@@ -505,9 +521,15 @@ class CellLabelingApp {
         }
     }
 
-    submitRegion() {
-        const url = `http://localhost:${PORT}/submit_region`;
+    submitRegion({isUpdate = false}={}) {
+        /* Submit labels for region *
 
+        Args
+        ----------
+        - isUpdate:
+            Whether updating labels
+        /
+         */
         const roi_extra = Array.from(this.notes).map(x => {
             const [roi_id, notes] = x;
             return {
@@ -534,9 +556,22 @@ class CellLabelingApp {
             roi_extra,
             duration: (Date.now() - this.labelingStart) / 1000
         };
+
+        let url;
+        if (isUpdate) {
+            url = `http://localhost:${PORT}/update_labels_for_region`;
+        } else {
+            url = `http://localhost:${PORT}/submit_region`;
+        }
+
         return $.post(url, JSON.stringify(data))
             .then(async () => {
-                const msg = `Successfully submitted labels for region<br>Loading next region`;
+                let msg;
+                if (isUpdate) {
+                    msg = `Successfully updated labels for region ${this.region['id']}`;
+                } else {
+                    msg = 'Successfully submitted labels for region<br>Loading next region';
+                }
                 displayTemporaryAlert({
                     msg,
                     type: 'success'
@@ -828,7 +863,7 @@ class CellLabelingApp {
         this.notes.set(this.selected_roi.id, notes);
     }
 
-    handleSubmitRegion({userHasReviewed = false} = {}) {
+    handleSubmitRegion({userHasReviewed = false, isUpdate = false} = {}) {
         /* Handles submit labels button click 
         
         Args
@@ -836,25 +871,29 @@ class CellLabelingApp {
         - userHasReviewed:
             Whether the user has reviewed any label-classifier 
             discrepancies and chose to ignore them
+        - isUpdate:
+            Whether updating existing labels
         */
         $('button#submit_labels').attr('disabled', true);
 
         if (!userHasReviewed) {
-            const isValid = this.validateLabels();
+            const isValid = this.validateLabels({isUpdate});
             if (!isValid) {
                 $('button#submit_labels').attr('disabled', false);
                 return;
             }
         }
 
-        this.submitRegion().then(() => {
-            this.loadNewRegion();
+        this.submitRegion({isUpdate}).then(() => {
+            if (!isUpdate) {
+                this.loadNewRegion();
+            }
         }).catch(e => {
             $('button#submit_labels').attr('disabled', false);
         });
     }
 
-    validateLabels() {
+    validateLabels({isUpdate = false}={}) {
         /* Flags any rois which might have been incorrectly labeled.
         Any rois with a label that disagrees with the classifier score are flagged */
         const maybeCell = this.rois
@@ -907,7 +946,7 @@ class CellLabelingApp {
             });
 
             $('#review-modal #submit-anyway').click(() => {
-                this.handleSubmitRegion({userHasReviewed: true});
+                this.handleSubmitRegion({userHasReviewed: true, isUpdate});
                 modal.hide();
             });
 
@@ -1060,11 +1099,12 @@ class CellLabelingApp {
     }
 
     async #handleSubmittedRegionsTableCLick(row, tr) {
+        // hide submit labels button and show update button
+        $('#submit_labels').hide();
+        $('#update_labels').show();
+
         // Click the review tab
         $('#nav-review-tab').tab('show');
-
-        // Update button
-        $('#submit_labels').text('Update labels for region');
 
         // highlight selected row
         $(tr).addClass('table-primary').siblings().removeClass('table-primary');
@@ -1110,6 +1150,10 @@ class CellLabelingApp {
     }
 
     #handleLabelNewRegionClick() {
+        // hide update labels button and show submit button
+        $('#submit_labels').show();
+        $('#update_labels').hide();
+
         $('#nav-label-tab').tab('show');
         $('#submitted-regions-table tbody tr').each(_, v => {
             v.removeClass('table-primary');
