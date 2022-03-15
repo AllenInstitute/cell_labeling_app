@@ -69,9 +69,13 @@ class CellLabelingApp {
             this.handleNotes();
         });
 
-        $('#nav-review').on('click', () => {
+        $('#nav-review-tab').on('click', () => {
             this.#handleReviewNavClick();
-        })
+        });
+
+        $('#nav-label-tab').on('click', () => {
+            this.#handleLabelNewRegionClick();
+        });
     }
 
     addProjectionListeners() {
@@ -1063,11 +1067,18 @@ class CellLabelingApp {
                 this.#handleSubmittedRegionsTableCLick(row, tr);
             }
         });
+
+        // Toggle review tab state
+        if (labels.length === 0) {
+            $('#nav-review-tab').addClass('disabled');
+        } else {
+            $('#nav-review-tab').removeClass('disabled');
+        }
     }
 
     async #handleSubmittedRegionsTableCLick(row, tr) {
         // Click the review tab
-        $('#nav-review').tab('show');
+        $('#nav-review-tab').tab('show');
 
         // Update button
         $('#submit_labels').text('Update labels for region');
@@ -1113,6 +1124,14 @@ class CellLabelingApp {
         const data = $('#submitted-regions-table').bootstrapTable('getData');
         const tr = $('#submitted-regions-table tbody').children('tr:first');
         this.#handleSubmittedRegionsTableCLick(data[0], tr);
+    }
+
+    #handleLabelNewRegionClick() {
+        $('#nav-label-tab').tab('show');
+        $('#submitted-regions-table tbody tr').each(_, v => {
+            v.removeClass('table-primary');
+        });
+        this.loadNewRegion();
     }
 }
 
