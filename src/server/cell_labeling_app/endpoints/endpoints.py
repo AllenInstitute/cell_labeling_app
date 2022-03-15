@@ -63,14 +63,7 @@ def get_random_region():
             'region': None
         }
 
-    region = {
-        'experiment_id': next_region.experiment_id,
-        'id': next_region.id,
-        'x': next_region.x,
-        'y': next_region.y,
-        'width': next_region.width,
-        'height': next_region.height
-    }
+    region = next_region.to_dict()
     return {
         'experiment_id': next_region.experiment_id,
         'region': region
@@ -429,3 +422,27 @@ def get_user_submitted_labels():
         'labels': labels
     }
 
+
+@api.route('/get_region', methods=['GET'])
+def get_region():
+    region_id = request.args['region_id']
+    region_id = int(region_id)
+    try:
+        region = util.get_region(region_id=region_id)
+        region = region.to_dict()
+        return {
+            'experiment_id': region['experiment_id'],
+            'region': region
+        }
+    except RuntimeError as e:
+        return e, 400
+
+
+@api.route('/get_labels_for_region', methods=['GET'])
+def get_labels_for_region():
+    region_id = request.args['region_id']
+    region_id = int(region_id)
+    labels = util.get_labels_for_region(region_id=region_id)
+    return {
+        'labels': labels
+    }

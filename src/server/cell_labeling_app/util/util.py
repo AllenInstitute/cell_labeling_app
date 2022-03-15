@@ -1,4 +1,5 @@
 import base64
+import json
 import random
 from io import BytesIO
 from pathlib import Path
@@ -262,22 +263,16 @@ def get_user_has_labeled() -> List[Dict]:
             submitted: datetime label submitted
             region_id
             experiment_id
+            x
     """
-    # 'x': next_region.x,
-    # 'y': next_region.y,
-    # 'width': next_region.width,
-    # 'height': next_region.height
     job_id = _get_current_job_id()
 
     user_has_labeled = \
         (db.session
          .query(UserLabels.timestamp.label('submitted'),
+                UserLabels.labels,
                 JobRegion.id.label('region_id'),
-                JobRegion.experiment_id,
-                JobRegion.x,
-                JobRegion.y,
-                JobRegion.width,
-                JobRegion.height)
+                JobRegion.experiment_id)
          .join(JobRegion, JobRegion.id == UserLabels.region_id)
          .filter(JobRegion.job_id == job_id,
                  UserLabels.user_id == current_user.get_id())
@@ -348,3 +343,36 @@ def get_total_regions_in_labeling_job() -> int:
          .count()
          )
     return n
+
+
+def get_region(region_id: int) -> JobRegion:
+    """
+    Gets the region from the database given by `region_id`
+    :param region_id:
+        Region id
+    :return:
+        JobRegion for region_id
+    """
+    region = \
+        (db.session
+         .query(JobRegion)
+         .filter(JobRegion.id == region_id)
+         .first())
+    return region
+
+
+def get_labels_for_region(region_id: int) -> List[dict]:
+    """
+    Gets the labels for region given by `region_id`
+    :param region_id:
+        Region id
+    :return:
+        labels for region given by `region_id`
+    """
+    labels = \
+        (db.session
+         .query(UserLabels.labels)
+         .filter(UserLabels.region_id == region_id)
+         .first())
+    labels = json.loads(labels[0])
+    return labels

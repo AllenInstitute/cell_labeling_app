@@ -81,29 +81,6 @@ class CellLabelingApp {
 
     }
 
-    async getRandomRegionFromRandomExperiment() {
-        const region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
-            let region;
-            if (data['region'] === null) {
-                // No more regions to label
-                window.location = `http://localhost:${PORT}/done.html`;
-            } else {
-                this.experiment_id = data['experiment_id'];
-                this.region = data['region'];
-                region = this.region;
-            }
-            return region;
-        });
-
-        if (region['region'] !== null) {
-            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.region));
-            this.fovBounds = fovBounds;
-        }
-
-        return region;
-
-    }
-
     displayTrace() {
         const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`;
 
@@ -219,8 +196,6 @@ class CellLabelingApp {
     }
 
     async displayProjection() {
-        $('#projection-spinner').show();
-
         // Disable projection settings until loaded
         $('#projection_type').attr('disabled', true);
         $("#projection_include_mask_outline").attr("disabled", true);
@@ -301,8 +276,6 @@ class CellLabelingApp {
             await this.updateShapesOnProjection();
 
             this.updateProjectionContrast();
-
-            $('#projection-spinner').hide();
         });
     }
 
@@ -471,6 +444,7 @@ class CellLabelingApp {
     }
 
     async loadNewRegion(region_id = null) {
+        $('#projection-spinner').show();
         $('#movie').remove();
         this.initialize();
         $('#loading_text').css('display', 'inline');
@@ -479,10 +453,15 @@ class CellLabelingApp {
         try {
             if (region_id === null) {
                 this.#populateSubmittedRegionsTable();
-                region = await this.getRandomRegionFromRandomExperiment();
+                region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
+                    if (data['region'] === null) {
+                        // No more regions to label
+                        window.location = `http://localhost:${PORT}/done.html`;
+                    }
+                });
             } else {
-                // todo
-                region = null;
+                region = await fetch(`http://localhost:${PORT}/get_region?region_id=${region_id}`)
+                    .then(res => res.json());
             }
         } catch (e) {
             $('#loading_text').hide();
@@ -490,17 +469,28 @@ class CellLabelingApp {
                 msg: 'Error loading region',
                 type: 'danger'
             });
+            $('#projection-spinner').hide();
             return;
         }
 
-        $('#region_meta').html(
-            `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
-        this.motionBorder = await fetch(
-        `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
-        ).then(data => data.json());
+        this.region = region['region'];
+        this.experiment_id = region['experiment_id'];
+
+        const promises = [
+            $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(region['region'])),
+            fetch(`http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
+                ).then(data => data.json())
+        ]
+
+        const [fovBounds, motionBorder] = await Promise.all(promises);
+        this.fovBounds = fovBounds;
+        this.motionBorder = motionBorder;
 
         if (region['region'] !== null) {
             return this.displayArtifacts().then(() => {
+                $('#projection-spinner').hide();
+                $('#region_meta').html(
+                    `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
                 $('button#submit_labels').attr('disabled', false);
             })
         }
@@ -1052,7 +1042,7 @@ class CellLabelingApp {
                     return Date.parse(a) - Date.parse(b);
                 }
             </script>
-            <table id="submitted-regions-table" data-height="300" data-toggle="table">
+            <table id="submitted-regions-table" class="table table-sm table-hover" data-height="300" data-toggle="table">
                 <thead>
                     <tr>
                         <th data-field="submitted" data-sortable="true" data-sorter="datesSorter">Submitted</th>
@@ -1064,27 +1054,49 @@ class CellLabelingApp {
                 ${tableRowsHtml}
                 </tbody>
             </table>`);
-        $('#submitted-regions-table').bootstrapTable();
-        $('#submitted-regions-table tbody tr').click(event => {
-            this.#handleSubmittedRegionsTableCLick(event);
+        $('#submitted-regions-table').bootstrapTable({
+            onClickRow: (row, tr) => {
+                this.#handleSubmittedRegionsTableCLick(row, tr);
+            }
         });
     }
 
-    #handleSubmittedRegionsTableCLick(row) {
-        const headers = [];
-        $(row.target).parent().parent().parent().find('th').each(function() {
-            headers.push($(this).attr('data-field'));
-        });
-
-        const rowValues = [];
-        $(row.target).closest('tr').find('td').each(function() {
-            rowValues.push($(this).text());
-        });
-
+    async #handleSubmittedRegionsTableCLick(row, tr) {
         // highlight selected row
-        $(row.target).closest('tr').addClass('table-primary').siblings().removeClass('table-primary');
+        $(tr).addClass('table-primary').siblings().removeClass('table-primary');
 
-        const region_id = rowValues[headers.indexOf('region_id')];
+        const region_id = row['region_id'];
+
+        const promises = [
+            fetch(`http://localhost:${PORT}/get_labels_for_region?region_id=${region_id}`)
+                .then(res => res.json())
+                .then(res => res['labels']),
+            this.loadNewRegion(region_id)
+        ];
+
+        const [labels, _] = await Promise.all(promises);
+
+        const roiId_label_map = new Map();
+        labels.forEach(label => {
+            roiId_label_map.set(label['roi_id'], label['label']);
+        })
+        this.rois.forEach(roi => {
+            roi.label = roiId_label_map.get(roi.id)
+        });
+
+        // add any non-segmented points
+        labels.forEach(label => {
+            if (label.point) {
+                this.rois.push(new ROI({
+                    id: label.roi_id,
+                    experiment_id: this.experiment_id,
+                    color: [255, 0, 0],
+                    label: 'cell',
+                    point: label.point
+                }));
+            }
+        });
+        this.updateShapesOnProjection();
     }
 }
 

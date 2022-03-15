@@ -33,6 +33,17 @@ class JobRegion(db.Model):
                f'{self.experiment_id}, x: {self.x}, y: {self.y}, width: ' \
                f'{self.width}, height: {self.height}'
 
+    def to_dict(self) -> dict:
+        region = {
+            'experiment_id': self.experiment_id,
+            'id': self.id,
+            'x': self.x,
+            'y': self.y,
+            'width': self.width,
+            'height': self.height
+        }
+        return region
+
 
 class User(UserMixin, db.Model):
     """A user"""
