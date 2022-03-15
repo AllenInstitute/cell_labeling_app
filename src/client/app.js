@@ -1121,13 +1121,21 @@ class CellLabelingApp {
 
         const promises = [
             fetch(`http://localhost:${PORT}/get_labels_for_region?region_id=${region_id}`)
-                .then(res => res.json())
-                .then(res => res['labels']),
+                .then(res => res.json()),
             this.loadNewRegion(region_id)
         ];
 
-        const [labels, _] = await Promise.all(promises);
+        let [labels, _] = await Promise.all(promises);
 
+        const roiExtra = labels['roi_extra'];
+        labels = labels['labels'];
+
+        // Update notes
+        roiExtra.forEach(v => {
+            this.notes.set(v.roi_id, v.notes);
+        });
+
+        // Update labels
         const roiId_label_map = new Map();
         labels.forEach(label => {
             roiId_label_map.set(label['roi_id'], label['label']);

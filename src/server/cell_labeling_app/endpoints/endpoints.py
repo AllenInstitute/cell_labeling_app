@@ -442,9 +442,10 @@ def get_region():
 def get_labels_for_region():
     region_id = request.args['region_id']
     region_id = int(region_id)
-    labels = util.get_labels_for_region(region_id=region_id)
+    labels, roi_extra = util.get_labels_for_region(region_id=region_id)
     return {
-        'labels': labels
+        'labels': labels,
+        'roi_extra': roi_extra
     }
 
 

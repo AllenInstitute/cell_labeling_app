@@ -361,13 +361,13 @@ def get_region(region_id: int) -> JobRegion:
     return region
 
 
-def get_labels_for_region(region_id: int) -> List[dict]:
+def get_labels_for_region(region_id: int) -> Tuple[List[dict], List[dict]]:
     """
-    Gets the labels for region given by `region_id`
+    Gets the labels and roi meta for region given by `region_id`
     :param region_id:
         Region id
     :return:
-        labels for region given by `region_id`
+        tuple of labels, roi_extra for region given by `region_id`
     """
     labels = \
         (db.session
@@ -376,7 +376,16 @@ def get_labels_for_region(region_id: int) -> List[dict]:
          .filter(UserLabels.user_id == current_user.get_id())
          .first())
     labels = json.loads(labels[0])
-    return labels
+
+    roi_extra = (
+        db.session
+        .query(UserRoiExtra)
+        .filter(UserRoiExtra.user_id == current_user.get_id())
+        .filter(UserRoiExtra.region_id == region_id)
+        .all()
+    )
+    roi_extra = [{'roi_id': x.roi_id, 'notes': x.notes} for x in roi_extra]
+    return labels, roi_extra
 
 
 def update_labels_for_region(region_id: int, labels: List[dict]):
@@ -421,7 +430,7 @@ def update_roi_extra_for_region(region_id: int, roi_extra: List[dict]):
         .filter(UserRoiExtra.region_id == region_id)
         .all()
     )
-    current_roi_extra = set(current_roi_extra)
+    current_roi_extra = set([x.roi_id for x in current_roi_extra])
 
     needs_update = [x for x in roi_extra if x['roi_id'] in current_roi_extra]
     needs_add = [x for x in roi_extra if x['roi_id'] not in current_roi_extra]
@@ -429,6 +438,7 @@ def update_roi_extra_for_region(region_id: int, roi_extra: List[dict]):
     for data in needs_update:
         roi_extra = (
             db.session
+            .query(UserRoiExtra)
             .filter(UserRoiExtra.user_id == user_id)
             .filter(UserRoiExtra.region_id == region_id)
             .first()
