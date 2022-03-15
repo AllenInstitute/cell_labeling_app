@@ -68,6 +68,10 @@ class CellLabelingApp {
         $('#notes').on('input', () => {
             this.handleNotes();
         });
+
+        $('#nav-review').on('click', () => {
+            this.#handleReviewNavClick();
+        })
     }
 
     addProjectionListeners() {
@@ -1062,6 +1066,12 @@ class CellLabelingApp {
     }
 
     async #handleSubmittedRegionsTableCLick(row, tr) {
+        // Click the review tab
+        $('#nav-review').tab('show');
+
+        // Update button
+        $('#submit_labels').text('Update labels for region');
+
         // highlight selected row
         $(tr).addClass('table-primary').siblings().removeClass('table-primary');
 
@@ -1097,6 +1107,12 @@ class CellLabelingApp {
             }
         });
         this.updateShapesOnProjection();
+    }
+
+    #handleReviewNavClick() {
+        const data = $('#submitted-regions-table').bootstrapTable('getData');
+        const tr = $('#submitted-regions-table tbody').children('tr:first');
+        this.#handleSubmittedRegionsTableCLick(data[0], tr);
     }
 }
 
