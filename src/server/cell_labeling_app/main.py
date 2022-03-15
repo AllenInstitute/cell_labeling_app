@@ -143,6 +143,7 @@ class App(argschema.ArgSchemaParser):
         database_path = Path(self.args['database_path'])
         backup_manager = BackupManager(
             app=app,
+            log_filepath=self.args['LOG_FILE'],
             database_path=database_path,
             backup_dir=database_path.parent / 'backups',
             frequency=self.args['backup_params']['frequency']

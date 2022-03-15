@@ -9,13 +9,12 @@ import numpy as np
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import UserLabels
 
-logger = logging.getLogger(__name__)
-
 
 class BackupManager:
     """Backup manager"""
     def __init__(self,
                  app: flask.Flask,
+                 log_filepath: str,
                  database_path: Path,
                  backup_dir: Path,
                  frequency: int = 60 * 5):
@@ -29,7 +28,16 @@ class BackupManager:
         :param frequency:
             Frequency in seconds to check if a backup should be made
         """
+        logging.basicConfig(
+            filename=log_filepath,
+            level=logging.INFO,
+            format='%(name)s: %(asctime)s %(levelname)-8s %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+            force=True
+        )
+
         self._app = app
+        self._logger = logging.getLogger(__name__)
         self._database_path = database_path
         self._backup_dir = backup_dir
         self._frequency = frequency
@@ -45,7 +53,7 @@ class BackupManager:
             while True:
                 num_records = self._get_num_label_records()
                 if num_records > self._num_records:
-                    logger.info(
+                    self._logger.info(
                         f'Current number of label records: {num_records}, '
                         f'previous: {self._num_records}.')
                     self._make_backup()
@@ -57,7 +65,7 @@ class BackupManager:
         backup_path = self._backup_dir / f'{self._database_path.stem}_' \
                       f'{int(time.time())}.db'
         shutil.copy(self._database_path, backup_path)
-        logger.info(f'Created new backup {backup_path}')
+        self._logger.info(f'Created new backup {backup_path}')
 
     def _cleanup_backups(self, retention_count: int = 1):
         """
