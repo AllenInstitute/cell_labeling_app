@@ -461,6 +461,7 @@ class CellLabelingApp {
         try {
             if (region_id === null) {
                 this.#populateSubmittedRegionsTable();
+                this.#updateProgress();
                 region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
                     if (data['region'] === null) {
                         // No more regions to label
@@ -535,25 +536,7 @@ class CellLabelingApp {
         };
         return $.post(url, JSON.stringify(data))
             .then(async () => {
-                // Update labeler stats
-                const statsHtml = await fetch(
-                    `http://localhost:${PORT}/get_label_stats`
-                )
-                    .then(data => data.json())
-                    .then(stats => {
-                        const total = stats['n_total'];
-                        const completed = stats['n_completed'];
-                        const userLabeled = stats['n_user_has_labeled'];
-                        const html = `
-                            <p>
-                                You have labeled
-                                <span class="label_stats">${userLabeled}</span> ${userLabeled > 1 || userLabeled === 0 ? 'regions' : 'region'}
-                                and there are <span class="label_stats">${total - userLabeled - completed}</span> remaining
-                            </p>`;
-                        return html;
-                    }
-                );
-                const msg = `Successfully submitted labels for region<br>Loading next region<br>${statsHtml}`;
+                const msg = `Successfully submitted labels for region<br>Loading next region`;
                 displayTemporaryAlert({
                     msg,
                     type: 'success'
@@ -1132,6 +1115,34 @@ class CellLabelingApp {
             v.removeClass('table-primary');
         });
         this.loadNewRegion();
+    }
+
+    async #updateProgress() {
+        fetch(
+        `http://localhost:${PORT}/get_label_stats`
+        )
+        .then(data => data.json())
+        .then(stats => {
+            const total = stats['n_total'];
+            const completed = stats['n_completed'];
+            const userLabeled = stats['n_user_has_labeled'];
+            const numLabelersRequiredPerRegion = stats['num_labelers_required_per_region'];
+            const totalProgress = completed / total;
+            const userProgress = userLabeled / (total - completed);
+
+            const progressHtml = `
+                <p>${userLabeled} / ${total - completed} labeled</p>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: ${userProgress}%;" aria-valuenow="${userLabeled}" aria-valuemin="0" aria-valuemax="${total}"></div>
+                </div>
+                <p style="margin-top: 10px">${completed} / ${total} labeled by ${numLabelersRequiredPerRegion} labelers</p>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: ${totalProgress}%;" aria-valuenow="${completed}" aria-valuemin="0" aria-valuemax="${total}"></div>
+                </div>`;
+
+            $('#progress-container').html(progressHtml);
+            }
+        );
     }
 }
 
