@@ -218,8 +218,25 @@
     </div>
 </div>
 
-<div id="modal-review-container">
+<div id="modal-review-container"></div>
 
+<div class="modal" tabindex="-1" id="in-progress-warning-modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Unsaved changes</h5>
+                <button type="button" class="btn-close" aria-label="Close" id="in-progress-modal-close"></button>
+            </div>
+            <div class="modal-body">
+                <p>There are unsaved changes. Are you sure?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="in-progress-no">No</button>
+                <button type="button" class="btn btn-primary" id="in-progress-ok">Yes</button>
+            </div>
+        </div>
+    </div>
 </div>
+
 </body>
 </html>

@@ -80,6 +80,10 @@ class CellLabelingApp {
         $('#nav-label-tab').on('click', () => {
             this.#handleLabelNewRegionClick();
         });
+
+        $('#in-progress-no, #in-progress-modal-close').on('click', () => {
+            $('#in-progress-warning-modal').modal('hide');
+        })
     }
 
     addProjectionListeners() {
@@ -151,6 +155,7 @@ class CellLabelingApp {
                 }));
                 rois = rois.filter(x => x.contours.length > 0);
                 this.rois = rois;
+                this.roisUnchanged = JSON.parse(JSON.stringify(rois));
 
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
@@ -429,6 +434,7 @@ class CellLabelingApp {
         this.is_trace_shown = false;
         this.is_video_shown = false;
         this.rois = null;
+        this.roisUnchanged = null;
         this.discrepancy_rois = null;
         this.fovBounds = null;
         this.experiment_id = null;
@@ -438,6 +444,7 @@ class CellLabelingApp {
         this.is_loading_new_region = false;
         this.selected_roi = null;
         this.notes = new Map();
+        this.notesUnchanged = new Map();
         this.labelingStart = Date.now();
         this.resetSideNav();
 
@@ -476,6 +483,7 @@ class CellLabelingApp {
         let region;
         try {
             if (region_id === null) {
+                // Loading a random region
                 this.#populateSubmittedRegionsTable();
                 this.#updateProgress();
                 region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
@@ -485,6 +493,7 @@ class CellLabelingApp {
                     }
                 });
             } else {
+                // Loading a specific region
                 region = await fetch(`http://localhost:${PORT}/get_region?region_id=${region_id}`)
                     .then(res => res.json());
             }
@@ -887,6 +896,10 @@ class CellLabelingApp {
         this.submitRegion({isUpdate}).then(() => {
             if (!isUpdate) {
                 this.loadNewRegion();
+            } else {
+                // Set the unchanged state to the currently submitted state
+                this.roisUnchanged = JSON.parse(JSON.stringify(this.rois));
+                this.notesUnchanged = new Map(this.notes);
             }
         }).catch(e => {
             $('button#submit_labels').attr('disabled', false);
@@ -1107,74 +1120,112 @@ class CellLabelingApp {
     }
 
     async #handleSubmittedRegionsTableCLick(row, tr) {
-        // hide submit labels button and show update button
-        $('#submit_labels').hide();
-        $('#update_labels').show();
+        const handleReviewTableClickOk = async () => {
+            // hide submit labels button and show update button
+            $('#submit_labels').hide();
+            $('#update_labels').show();
 
-        // Click the review tab
-        $('#nav-review-tab').tab('show');
+            // Click the review tab
+            $('#nav-review-tab').tab('show');
 
-        // highlight selected row
-        $(tr).addClass('table-primary').siblings().removeClass('table-primary');
+            // highlight selected row
+            $(tr).addClass('table-primary').siblings().removeClass('table-primary');
 
-        const region_id = row['region_id'];
+            const region_id = row['region_id'];
 
-        const promises = [
-            fetch(`http://localhost:${PORT}/get_labels_for_region?region_id=${region_id}`)
-                .then(res => res.json()),
-            this.loadNewRegion(region_id)
-        ];
+            const promises = [
+                fetch(`http://localhost:${PORT}/get_labels_for_region?region_id=${region_id}`)
+                    .then(res => res.json()),
+                this.loadNewRegion(region_id)
+            ];
 
-        let [labels, _] = await Promise.all(promises);
+            let [labels, _] = await Promise.all(promises);
 
-        const roiExtra = labels['roi_extra'];
-        labels = labels['labels'];
+            const roiExtra = labels['roi_extra'];
+            labels = labels['labels'];
 
-        // Update notes
-        roiExtra.forEach(v => {
-            this.notes.set(v.roi_id, v.notes);
-        });
+            // Update notes
+            roiExtra.forEach(v => {
+                this.notes.set(v.roi_id, v.notes);
+            });
+            this.notesUnchanged = new Map(this.notes);
 
-        // Update labels
-        const roiId_label_map = new Map();
-        labels.forEach(label => {
-            roiId_label_map.set(label['roi_id'], label['label']);
-        })
-        this.rois.forEach(roi => {
-            roi.label = roiId_label_map.get(roi.id)
-        });
+            // Update labels
+            const roiId_label_map = new Map();
+            labels.forEach(label => {
+                roiId_label_map.set(label['roi_id'], label['label']);
+            })
+            this.rois.forEach(roi => {
+                roi.label = roiId_label_map.get(roi.id)
+            });
 
-        // add any non-segmented points
-        labels.forEach(label => {
-            if (label.point) {
-                this.rois.push(new ROI({
-                    id: label.roi_id,
-                    experiment_id: this.experiment_id,
-                    color: [255, 0, 0],
-                    label: 'cell',
-                    point: label.point
-                }));
-            }
-        });
-        this.updateShapesOnProjection();
+            // add any non-segmented points
+            labels.forEach(label => {
+                if (label.point) {
+                    this.rois.push(new ROI({
+                        id: label.roi_id,
+                        experiment_id: this.experiment_id,
+                        color: [255, 0, 0],
+                        label: 'cell',
+                        point: label.point
+                    }));
+                }
+            });
+            this.roisUnchanged = JSON.parse(JSON.stringify(this.rois));
+            this.updateShapesOnProjection();
+        }
+        const isUnsavedChanges = this.#isUnsavedChanges();
+        if (isUnsavedChanges) {
+            this.#handleUnsavedChanges(handleReviewTableClickOk);
+            return;
+        }
+
+        handleReviewTableClickOk();
     }
 
     #handleReviewNavClick() {
-        const data = $('#submitted-regions-table').bootstrapTable('getData');
-        const tr = $('#submitted-regions-table tbody').children('tr:first');
-        this.#handleSubmittedRegionsTableCLick(data[0], tr);
+        const handleReviewNavClickOk = () => {
+            const data = $('#submitted-regions-table').bootstrapTable('getData');
+            const tr = $('#submitted-regions-table tbody').children('tr:first');
+            this.#handleSubmittedRegionsTableCLick(data[0], tr);
+        };
+        const isUnsavedChanges = this.#isUnsavedChanges();
+        if (isUnsavedChanges) {
+            this.#handleUnsavedChanges(handleReviewNavClickOk);
+            return;
+        }
+        handleReviewNavClickOk();
+    }
+
+    #handleUnsavedChanges(callable) {
+        $('#in-progress-warning-modal').modal('show');
+
+        $('#in-progress-ok').off('click');
+        $('#in-progress-ok').on('click', () => {
+            $('#in-progress-warning-modal').modal('hide');
+            callable();
+        });
     }
 
     #handleLabelNewRegionClick() {
-        // hide update labels button and show submit button
-        $('#submit_labels').show();
-        $('#update_labels').hide();
+        const handleLabelNewRegionClickOk = () => {
+            // hide update labels button and show submit button
+            $('#submit_labels').show();
+            $('#update_labels').hide();
 
-        $('#nav-label-tab').tab('show');
-        $('#submitted-regions-table tbody tr').each(_, v => {
-            v.removeClass('table-primary');
-        });
-        this.loadNewRegion();
+            $('#nav-label-tab').tab('show');
+            $('#submitted-regions-table tbody tr').each(_, v => {
+                v.removeClass('table-primary');
+            });
+            this.loadNewRegion();
+        }
+
+        const isUnsavedChanges = this.#isUnsavedChanges();
+        if (isUnsavedChanges) {
+            this.#handleUnsavedChanges(handleLabelNewRegionClickOk);
+            return;
+        }
+        handleLabelNewRegionClickOk();
     }
 
     async #updateProgress() {
@@ -1203,6 +1254,29 @@ class CellLabelingApp {
             $('#progress-container').html(progressHtml);
             }
         );
+    }
+
+    #isUnsavedChanges() {
+        /* Check if the user made any unsaved changes */
+        const rois = this.rois
+            // Filtering out any currently selected non-cell points
+            .filter(x => x.contours !== null ||
+                   (x.point !== null && x.label === 'cell'));
+
+        if (rois.length !== this.roisUnchanged.length) {
+            return true;
+        }
+
+        return rois.some((roi, idx) => {
+            if (roi.label !== this.roisUnchanged[idx].label) {
+                return true;
+            }
+
+            if (this.notes[roi.id] !== this.notesUnchanged[roi.id]) {
+                return true;
+            }
+            return false;
+        });
     }
 }
 
