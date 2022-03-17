@@ -1097,8 +1097,8 @@ class CellLabelingApp {
                 <thead>
                     <tr>
                         <th data-field="submitted" data-sortable="true" data-sorter="datesSorter">Submitted</th>
-                        <th data-field="experiment_id">Exp. ID</th>
-                        <th data-field="region_id" >Region ID</th>
+                        <th data-field="experiment_id" data-sortable="true">Exp. ID</th>
+                        <th data-field="region_id">Region ID</th>
                     </tr>
                 </thead>
                 <tbody>
