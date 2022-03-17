@@ -61,3 +61,7 @@ span.label_stats {
 #submitted-regions-table tbody tr {
     cursor: pointer;
 }
+
+#nav-tabs {
+    font-size: 22px;
+}
