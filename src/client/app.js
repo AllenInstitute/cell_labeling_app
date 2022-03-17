@@ -1244,11 +1244,11 @@ class CellLabelingApp {
             const progressHtml = `
                 <p>${userLabeled} / ${total - completed} labeled</p>
                 <div class="progress">
-                    <div class="progress-bar" role="progressbar" style="width: ${userProgress}%;" aria-valuenow="${userLabeled}" aria-valuemin="0" aria-valuemax="${total}"></div>
+                    <div class="progress-bar" role="progressbar" style="width: ${userProgress * 100}%;" aria-valuenow="${userLabeled}" aria-valuemin="0" aria-valuemax="${total}"></div>
                 </div>
                 <p style="margin-top: 10px">${completed} / ${total} labeled by ${numLabelersRequiredPerRegion} labelers</p>
                 <div class="progress">
-                    <div class="progress-bar" role="progressbar" style="width: ${totalProgress}%;" aria-valuenow="${completed}" aria-valuemin="0" aria-valuemax="${total}"></div>
+                    <div class="progress-bar" role="progressbar" style="width: ${totalProgress * 100}%;" aria-valuenow="${completed}" aria-valuemin="0" aria-valuemax="${total}"></div>
                 </div>`;
 
             $('#progress-container').html(progressHtml);
