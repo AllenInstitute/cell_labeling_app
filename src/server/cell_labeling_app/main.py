@@ -114,7 +114,7 @@ class App(argschema.ArgSchemaParser):
             f'--workers={self.args["num_workers"]}',
             '--capture-output',
             '--name=cell_labeling_app',
-            '--log-level=info'
+            '--log-level=info',
             '--timeout=90'
         ]
         if self.args['ACCESS_LOG_FILE'] is not None:
@@ -162,7 +162,7 @@ def main(input_json_path: str, session_secret_key: str) -> Flask:
 
 if __name__ == '__main__':
     app = App()
-    # app.create_backup_manager()
+    app.create_backup_manager()
 
     if app.args['debug']:
         flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))

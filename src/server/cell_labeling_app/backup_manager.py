@@ -29,7 +29,7 @@ class BackupManager:
             Frequency in seconds to check if a backup should be made
         """
 
-        self._logger = logging.getLogger(__name__)
+        self._logger = self._configure_logger(log_file=log_file)
         app = Flask(__name__)
         app.config['SQLALCHEMY_DATABASE_URI'] = \
             f'sqlite:///{database_path}'
@@ -43,6 +43,19 @@ class BackupManager:
         with self._app.app_context():
             self._num_records = self._get_num_label_records()
         os.makedirs(backup_dir, exist_ok=True)
+
+    @staticmethod
+    def _configure_logger(log_file):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        if log_file is not None:
+            fh = logging.FileHandler(filename=log_file)
+            fh.setLevel(logging.INFO)
+            fh.setFormatter(logging.Formatter(
+                '[%(levelname)s] %(asctime)s: Backup Manager: %(message)s',
+                "%Y-%m-%d %H:%M:%S"))
+            logger.addHandler(fh)
+        return logger
 
     def run(self):
         """Checks to see if there have been new labels added since last time.
