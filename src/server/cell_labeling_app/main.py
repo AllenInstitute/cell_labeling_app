@@ -121,6 +121,9 @@ class App(argschema.ArgSchemaParser):
             gunicorn_cmd_args.append(
                 f'--access-logfile {self.args["ACCESS_LOG_FILE"]}')
 
+        if self.args['LOG_FILE'] is not None:
+            gunicorn_cmd_args.append(f'--log-file {self.args["LOG_FILE"]}')
+
         if self.args['debug']:
             gunicorn_cmd_args.append('--reload')
 
