@@ -114,7 +114,6 @@ class App(argschema.ArgSchemaParser):
             f'--workers={self.args["num_workers"]}',
             '--capture-output',
             '--name=cell_labeling_app',
-            '--log-level=info',
             '--timeout=90'
         ]
         if self.args['ACCESS_LOG_FILE'] is not None:
