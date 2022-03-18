@@ -162,7 +162,7 @@ def main(input_json_path: str, session_secret_key: str) -> Flask:
 
 if __name__ == '__main__':
     app = App()
-    app.create_backup_manager()
+    # app.create_backup_manager()
 
     if app.args['debug']:
         flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))
