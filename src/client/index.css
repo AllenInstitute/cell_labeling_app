@@ -1,6 +1,6 @@
 /* The sidebar menu */
 .sidenav {
-    height: 100%; /* Full-height: remove this if you want "auto" height */
+    height: 90%;
     width: 400px; /* Set the width of the sidebar */
     position: fixed; /* Fixed Sidebar (stay in place on scroll) */
     z-index: 1; /* Stay on top */
@@ -19,6 +19,9 @@
     overflow-x: hidden; !important;
   }
 
+.sidenav .sidenav-section {
+    margin-bottom: 20px;
+}
 
 .sidenav .sidenav-section h3{
     background-color: rgb(223, 223, 223);
@@ -28,7 +31,7 @@
 .sidenav .sidenav-content {
     margin-left: 13px;
     margin-top: 20px;
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .sidenav .sidenav-content > * {
@@ -47,6 +50,18 @@
     display: none;
 }
 
-p#label_stats span {
+span.label_stats {
     font-weight: bold;
+}
+
+#submitted-regions-table td {
+    font-size: 14px;
+}
+
+#submitted-regions-table tbody tr {
+    cursor: pointer;
+}
+
+#nav-tabs {
+    font-size: 22px;
 }

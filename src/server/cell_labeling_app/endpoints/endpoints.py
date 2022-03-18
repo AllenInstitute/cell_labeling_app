@@ -63,14 +63,7 @@ def get_random_region():
             'region': None
         }
 
-    region = {
-        'experiment_id': next_region.experiment_id,
-        'id': next_region.id,
-        'x': next_region.x,
-        'y': next_region.y,
-        'width': next_region.width,
-        'height': next_region.height
-    }
+    region = next_region.to_dict()
     return {
         'experiment_id': next_region.experiment_id,
         'region': region
@@ -414,3 +407,53 @@ def _create_circle_mask_for_nonsegmented_point(
     center_x, center_y = point
     return x[center_y - radius:center_y + radius+1,
              center_x - radius:center_x + radius+1].astype(bool).tolist()
+
+
+@api.route('/get_user_submitted_labels')
+def get_user_submitted_labels():
+    labels = get_user_has_labeled()
+    labels = [
+        {
+            'submitted': r['submitted'],
+            'experiment_id': r['experiment_id'],
+            'region_id': r['region_id']
+        } for r in labels]
+    return {
+        'labels': labels
+    }
+
+
+@api.route('/get_region', methods=['GET'])
+def get_region():
+    region_id = request.args['region_id']
+    region_id = int(region_id)
+    try:
+        region = util.get_region(region_id=region_id)
+        region = region.to_dict()
+        return {
+            'experiment_id': region['experiment_id'],
+            'region': region
+        }
+    except RuntimeError as e:
+        return e, 400
+
+
+@api.route('/get_labels_for_region', methods=['GET'])
+def get_labels_for_region():
+    region_id = request.args['region_id']
+    region_id = int(region_id)
+    labels, roi_extra = util.get_labels_for_region(region_id=region_id)
+    return {
+        'labels': labels,
+        'roi_extra': roi_extra
+    }
+
+
+@api.route('/update_labels_for_region', methods=['POST'])
+def update_labels_for_region():
+    data = request.get_json(force=True)
+    util.update_labels_for_region(region_id=data['region_id'],
+                                  labels=data['labels'])
+    util.update_roi_extra_for_region(region_id=data['region_id'],
+                                     roi_extra=data['roi_extra'])
+    return 'success'

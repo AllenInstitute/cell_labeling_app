@@ -1,4 +1,5 @@
 import base64
+import json
 import random
 from io import BytesIO
 from pathlib import Path
@@ -13,7 +14,7 @@ from cell_labeling_app.database.database import db
 from flask import current_app
 
 from cell_labeling_app.database.schemas import JobRegion, UserLabels, \
-    LabelingJob
+    LabelingJob, UserRoiExtra
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from flask_login import current_user
 from sqlalchemy import func, desc
@@ -254,22 +255,29 @@ def get_completed_regions() -> List[int]:
     return regions_with_enough_labels
 
 
-def get_user_has_labeled() -> List[int]:
+def get_user_has_labeled() -> List[Dict]:
     """
     Gets the list of region ids that the current user has labeled
     :return:
-        List of region ids
+        List of dict with keys
+            submitted: datetime label submitted
+            region_id
+            experiment_id
+            x
     """
     job_id = _get_current_job_id()
 
     user_has_labeled = \
         (db.session
-         .query(UserLabels.region_id)
+         .query(UserLabels.timestamp.label('submitted'),
+                UserLabels.labels,
+                JobRegion.id.label('region_id'),
+                JobRegion.experiment_id)
          .join(JobRegion, JobRegion.id == UserLabels.region_id)
          .filter(JobRegion.job_id == job_id,
                  UserLabels.user_id == current_user.get_id())
+         .order_by(UserLabels.timestamp.desc())
          .all())
-    user_has_labeled = [region.region_id for region in user_has_labeled]
     return user_has_labeled
 
 
@@ -285,6 +293,7 @@ def get_next_region() -> Optional[JobRegion]:
 
     # Get all region ids user has labeled
     user_has_labeled = get_user_has_labeled()
+    user_has_labeled = [region['region_id'] for region in user_has_labeled]
 
     regions_with_enough_labels = get_completed_regions()
     exclude_regions = user_has_labeled + regions_with_enough_labels
@@ -334,3 +343,112 @@ def get_total_regions_in_labeling_job() -> int:
          .count()
          )
     return n
+
+
+def get_region(region_id: int) -> JobRegion:
+    """
+    Gets the region from the database given by `region_id`
+    :param region_id:
+        Region id
+    :return:
+        JobRegion for region_id
+    """
+    region = \
+        (db.session
+         .query(JobRegion)
+         .filter(JobRegion.id == region_id)
+         .first())
+    return region
+
+
+def get_labels_for_region(region_id: int) -> Tuple[List[dict], List[dict]]:
+    """
+    Gets the labels and roi meta for region given by `region_id`
+    :param region_id:
+        Region id
+    :return:
+        tuple of labels, roi_extra for region given by `region_id`
+    """
+    labels = \
+        (db.session
+         .query(UserLabels.labels)
+         .filter(UserLabels.region_id == region_id)
+         .filter(UserLabels.user_id == current_user.get_id())
+         .first())
+    labels = json.loads(labels[0])
+
+    roi_extra = (
+        db.session
+        .query(UserRoiExtra)
+        .filter(UserRoiExtra.user_id == current_user.get_id())
+        .filter(UserRoiExtra.region_id == region_id)
+        .all()
+    )
+    roi_extra = [{'roi_id': x.roi_id, 'notes': x.notes} for x in roi_extra]
+    return labels, roi_extra
+
+
+def update_labels_for_region(region_id: int, labels: List[dict]):
+    """
+    Updates labels for region given by `region_id`
+
+    :param region_id:
+        region id
+    :param labels:
+        labels
+    :return: None
+    """
+    user_labels = (
+        db.session
+        .query(UserLabels)
+        .filter(UserLabels.region_id == region_id)
+        .filter(UserLabels.user_id == current_user.get_id())
+        .first()
+    )
+    user_labels.labels = json.dumps(labels)
+    db.session.commit()
+
+
+def update_roi_extra_for_region(region_id: int, roi_extra: List[dict]):
+    """
+    Update roi extra for region. If not in db already, adds it.
+
+    :param region_id:
+        region id
+    :param roi_extra:
+        List of Dict with keys:
+            - roi_id
+            - notes
+    :return: None
+    """
+    user_id = current_user.get_id()
+
+    current_roi_extra = (
+        db.session
+        .query(UserRoiExtra.roi_id)
+        .filter(UserRoiExtra.user_id == user_id)
+        .filter(UserRoiExtra.region_id == region_id)
+        .all()
+    )
+    current_roi_extra = set([x.roi_id for x in current_roi_extra])
+
+    needs_update = [x for x in roi_extra if x['roi_id'] in current_roi_extra]
+    needs_add = [x for x in roi_extra if x['roi_id'] not in current_roi_extra]
+
+    for data in needs_update:
+        roi_extra = (
+            db.session
+            .query(UserRoiExtra)
+            .filter(UserRoiExtra.user_id == user_id)
+            .filter(UserRoiExtra.region_id == region_id)
+            .first()
+        )
+        roi_extra.notes = data['notes']
+        db.session.commit()
+
+    for data in needs_add:
+        roi_extra = UserRoiExtra(user_id=user_id, region_id=region_id,
+                                 roi_id=data['roi_id'], notes=data['notes'])
+        db.session.add(roi_extra)
+
+    db.session.commit()

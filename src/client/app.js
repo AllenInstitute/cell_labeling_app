@@ -47,6 +47,10 @@ class CellLabelingApp {
             this.handleSubmitRegion();
         });
 
+        $('button#update_labels').on('click', () => {
+            this.handleSubmitRegion({isUpdate: true});
+        });
+
         $('input#projection_contrast_low_quantile, input#projection_contrast_high_quantile').on('input', () => {
             const low = $('input#projection_contrast_low_quantile').val();
             const high = $('input#projection_contrast_high_quantile').val()
@@ -68,6 +72,18 @@ class CellLabelingApp {
         $('#notes').on('input', () => {
             this.handleNotes();
         });
+
+        $('#nav-review-tab').on('click', () => {
+            this.#handleReviewNavClick();
+        });
+
+        $('#nav-label-tab').on('click', () => {
+            this.#handleLabelNewRegionClick();
+        });
+
+        $('#in-progress-no, #in-progress-modal-close').on('click', () => {
+            $('#in-progress-warning-modal').modal('hide');
+        })
     }
 
     addProjectionListeners() {
@@ -78,29 +94,6 @@ class CellLabelingApp {
             const [y, x] = point.pointIndex;
             this.handleProjectionClick(x, y);
         });
-
-    }
-
-    async getRandomRegionFromRandomExperiment() {
-        const region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
-            let region;
-            if (data['region'] === null) {
-                // No more regions to label
-                window.location = `http://localhost:${PORT}/done.html`;
-            } else {
-                this.experiment_id = data['experiment_id'];
-                this.region = data['region'];
-                region = this.region;
-            }
-            return region;
-        });
-
-        if (region['region'] !== null) {
-            const fovBounds = await $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(this.region));
-            this.fovBounds = fovBounds;
-        }
-
-        return region;
 
     }
 
@@ -162,6 +155,7 @@ class CellLabelingApp {
                 }));
                 rois = rois.filter(x => x.contours.length > 0);
                 this.rois = rois;
+                this.roisUnchanged = JSON.parse(JSON.stringify(rois));
 
                 $("#projection_include_mask_outline").attr("disabled", false);
                 $("#projection_type").attr("disabled", false);
@@ -219,8 +213,6 @@ class CellLabelingApp {
     }
 
     async displayProjection() {
-        $('#projection-spinner').show();
-
         // Disable projection settings until loaded
         $('#projection_type').attr('disabled', true);
         $("#projection_include_mask_outline").attr("disabled", true);
@@ -301,8 +293,6 @@ class CellLabelingApp {
             await this.updateShapesOnProjection();
 
             this.updateProjectionContrast();
-
-            $('#projection-spinner').hide();
         });
     }
 
@@ -444,6 +434,7 @@ class CellLabelingApp {
         this.is_trace_shown = false;
         this.is_video_shown = false;
         this.rois = null;
+        this.roisUnchanged = null;
         this.discrepancy_rois = null;
         this.fovBounds = null;
         this.experiment_id = null;
@@ -453,6 +444,7 @@ class CellLabelingApp {
         this.is_loading_new_region = false;
         this.selected_roi = null;
         this.notes = new Map();
+        this.notesUnchanged = new Map();
         this.labelingStart = Date.now();
         this.resetSideNav();
 
@@ -468,66 +460,85 @@ class CellLabelingApp {
         // Initialize contrast controls
         const contrast = this.#getContrastValues();
         this.#updateContrastControls(contrast);
-
-        // Update labeler stats
-        fetch(
-            `http://localhost:${PORT}/get_label_stats`
-        )
-            .then(data => data.json())
-            .then(stats => {
-                const total = stats['n_total'];
-                const completed = stats['n_completed'];
-                const userLabeled = stats['n_user_has_labeled'];
-                const numLabelersReqPerRegion = stats['num_labelers_required_per_region'];
-                let html = `
-                    <p>
-                        You have labeled
-                        <span>${userLabeled}</span> ${userLabeled > 1 || userLabeled === 0 ? 'regions' : 'region'}
-                        and there are <span>${total - userLabeled - completed}</span> remaining
-                    </p>`;
-                if (numLabelersReqPerRegion > 1) {
-                    html += `
-                        <p><span>${Math.round(completed / total * 100)}%</span> of regions have been labeled by ${numLabelersReqPerRegion} labelers</p>
-                    `;
-                }
-                $('p#label_stats').html(html);
-            }
-        );
     }
 
-    async loadNewRegion() {
+    async loadNewRegion(region_id = null) {
+        /* Loads a new region
+
+        Args
+        ------
+        - region_id:
+            Load a specific region.
+        */
+        if (!region_id) {
+            // If region id is not passed, we should be submitting,
+            // rather than updating
+            $('#submit_labels').show();
+        }
+        $('#projection-spinner').show();
         $('#movie').remove();
         this.initialize();
-        this.is_loading_new_region = true;
         $('#loading_text').css('display', 'inline');
 
-        const region = await this.getRandomRegionFromRandomExperiment()
-            .then(async region => {
-                this.is_loading_new_region = false;
-                $('#region_meta').html(
-                    `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
-                this.motionBorder = await fetch(
-            `http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
-                ).then(data => data.json());
-                return region;
-            })
-            .catch(() => {
-                $('#loading_text').hide();
-                displayTemporaryAlert({
-                    msg: 'Error loading region',
-                    type: 'danger'
+        let region;
+        try {
+            if (region_id === null) {
+                // Loading a random region
+                this.#populateSubmittedRegionsTable();
+                this.#updateProgress();
+                region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
+                    if (data['region'] === null) {
+                        // No more regions to label
+                        window.location = `http://localhost:${PORT}/done.html`;
+                    }
                 });
+            } else {
+                // Loading a specific region
+                region = await fetch(`http://localhost:${PORT}/get_region?region_id=${region_id}`)
+                    .then(res => res.json());
+            }
+        } catch (e) {
+            $('#loading_text').hide();
+            displayTemporaryAlert({
+                msg: 'Error loading region',
+                type: 'danger'
             });
+            $('#projection-spinner').hide();
+            return;
+        }
+
+        this.region = region['region'];
+        this.experiment_id = region['experiment_id'];
+
+        const promises = [
+            $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(region['region'])),
+            fetch(`http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
+                ).then(data => data.json())
+        ]
+
+        const [fovBounds, motionBorder] = await Promise.all(promises);
+        this.fovBounds = fovBounds;
+        this.motionBorder = motionBorder;
+
         if (region['region'] !== null) {
             return this.displayArtifacts().then(() => {
+                $('#projection-spinner').hide();
+                $('#region_meta').html(
+                    `Experiment id: ${this.experiment_id} | Region id: ${this.region['id']}`);
                 $('button#submit_labels').attr('disabled', false);
             })
         }
     }
 
-    submitRegion() {
-        const url = `http://localhost:${PORT}/submit_region`;
+    submitRegion({isUpdate = false}={}) {
+        /* Submit labels for region *
 
+        Args
+        ----------
+        - isUpdate:
+            Whether updating labels
+        /
+         */
         const roi_extra = Array.from(this.notes).map(x => {
             const [roi_id, notes] = x;
             return {
@@ -554,10 +565,24 @@ class CellLabelingApp {
             roi_extra,
             duration: (Date.now() - this.labelingStart) / 1000
         };
+
+        let url;
+        if (isUpdate) {
+            url = `http://localhost:${PORT}/update_labels_for_region`;
+        } else {
+            url = `http://localhost:${PORT}/submit_region`;
+        }
+
         return $.post(url, JSON.stringify(data))
-            .then(() => {
+            .then(async () => {
+                let msg;
+                if (isUpdate) {
+                    msg = `Successfully updated labels for region ${this.region['id']}`;
+                } else {
+                    msg = 'Successfully submitted labels for region<br>Loading next region';
+                }
                 displayTemporaryAlert({
-                    msg: 'Successfully submitted labels for region<br>Loading next region',
+                    msg,
                     type: 'success'
                 });
             })
@@ -847,7 +872,7 @@ class CellLabelingApp {
         this.notes.set(this.selected_roi.id, notes);
     }
 
-    handleSubmitRegion({userHasReviewed = false} = {}) {
+    handleSubmitRegion({userHasReviewed = false, isUpdate = false} = {}) {
         /* Handles submit labels button click 
         
         Args
@@ -855,31 +880,47 @@ class CellLabelingApp {
         - userHasReviewed:
             Whether the user has reviewed any label-classifier 
             discrepancies and chose to ignore them
+        - isUpdate:
+            Whether updating existing labels
         */
         $('button#submit_labels').attr('disabled', true);
 
         if (!userHasReviewed) {
-            const isValid = this.validateLabels();
+            const isValid = this.validateLabels({isUpdate});
             if (!isValid) {
                 $('button#submit_labels').attr('disabled', false);
                 return;
             }
         }
 
-        this.submitRegion().then(() => {
-            this.loadNewRegion();
+        this.submitRegion({isUpdate}).then(() => {
+            if (!isUpdate) {
+                this.loadNewRegion();
+            } else {
+                // Set the unchanged state to the currently submitted state
+                this.roisUnchanged = JSON.parse(JSON.stringify(this.rois));
+                this.notesUnchanged = new Map(this.notes);
+            }
         }).catch(e => {
             $('button#submit_labels').attr('disabled', false);
         });
     }
 
-    validateLabels() {
+    validateLabels({isUpdate = false}={}) {
         /* Flags any rois which might have been incorrectly labeled.
         Any rois with a label that disagrees with the classifier score are flagged */
         const maybeCell = this.rois
-            .filter(x => x.classifier_score >= 0.5 & x.label !== 'cell');
+            .filter(x => {
+                return x.classifier_score !== null &&
+                    x.classifier_score >= 0.5 &&
+                    x.label !== 'cell'
+            });
         const maybeNotCell = this.rois
-            .filter(x => x.classifier_score < 0.5 & x.label === 'cell');
+            .filter(x => {
+                return x.classifier_score !== null &&
+                    x.classifier_score < 0.5 &&
+                    x.label === 'cell'
+            });
 
         if (maybeCell.length > 0 || maybeNotCell.length > 0) {
             const msgs = [];
@@ -926,7 +967,7 @@ class CellLabelingApp {
             });
 
             $('#review-modal #submit-anyway').click(() => {
-                this.handleSubmitRegion({userHasReviewed: true});
+                this.handleSubmitRegion({userHasReviewed: true, isUpdate});
                 modal.hide();
             });
 
@@ -1022,6 +1063,220 @@ class CellLabelingApp {
         const shapes = [...contours, ...points, regionBoundary,
             ...motionBorder];
         Plotly.relayout('projection', {'shapes': shapes});
+    }
+
+    async #populateSubmittedRegionsTable() {
+        const labels = await fetch('/get_user_submitted_labels')
+            .then(res => res.json())
+            .then(res => res['labels']);
+        labels.forEach(l => {
+            l.submitted = new Date(l.submitted).toLocaleString();
+        });
+        const tableRowsHtml = labels.map(l => {
+            return `
+                <tr>
+                    <td>
+                        ${l.submitted}
+                    </td>
+                    <td>
+                        ${l.experiment_id}
+                    </td>
+                    <td>
+                        ${l.region_id}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        $('#regions-table-container').html(`
+            <script>
+                function datesSorter(a, b) {
+                    return Date.parse(a) - Date.parse(b);
+                }
+            </script>
+            <table id="submitted-regions-table" class="table table-sm table-hover" data-height="300" data-toggle="table">
+                <thead>
+                    <tr>
+                        <th data-field="submitted" data-sortable="true" data-sorter="datesSorter">Submitted</th>
+                        <th data-field="experiment_id" data-sortable="true">Exp. ID</th>
+                        <th data-field="region_id">Region ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                ${tableRowsHtml}
+                </tbody>
+            </table>`);
+        $('#submitted-regions-table').bootstrapTable({
+            onClickRow: (row, tr) => {
+                this.#handleSubmittedRegionsTableCLick(row, tr);
+            }
+        });
+
+        // Toggle review tab state
+        if (labels.length === 0) {
+            $('#nav-review-tab').addClass('disabled');
+        } else {
+            $('#nav-review-tab').removeClass('disabled');
+        }
+    }
+
+    async #handleSubmittedRegionsTableCLick(row, tr) {
+        const handleReviewTableClickOk = async () => {
+            // hide submit labels button and show update button
+            $('#submit_labels').hide();
+            $('#update_labels').show();
+
+            // Click the review tab
+            $('#nav-review-tab').tab('show');
+
+            // highlight selected row
+            $(tr).addClass('table-primary').siblings().removeClass('table-primary');
+
+            const region_id = row['region_id'];
+
+            const promises = [
+                fetch(`http://localhost:${PORT}/get_labels_for_region?region_id=${region_id}`)
+                    .then(res => res.json()),
+                this.loadNewRegion(region_id)
+            ];
+
+            let [labels, _] = await Promise.all(promises);
+
+            const roiExtra = labels['roi_extra'];
+            labels = labels['labels'];
+
+            // Update notes
+            roiExtra.forEach(v => {
+                this.notes.set(v.roi_id, v.notes);
+            });
+            this.notesUnchanged = new Map(this.notes);
+
+            // Update labels
+            const roiId_label_map = new Map();
+            labels.forEach(label => {
+                roiId_label_map.set(label['roi_id'], label['label']);
+            })
+            this.rois.forEach(roi => {
+                roi.label = roiId_label_map.get(roi.id)
+            });
+
+            // add any non-segmented points
+            labels.forEach(label => {
+                if (label.point) {
+                    this.rois.push(new ROI({
+                        id: label.roi_id,
+                        experiment_id: this.experiment_id,
+                        color: [255, 0, 0],
+                        label: 'cell',
+                        point: label.point
+                    }));
+                }
+            });
+            this.roisUnchanged = JSON.parse(JSON.stringify(this.rois));
+            this.updateShapesOnProjection();
+        }
+        const isUnsavedChanges = this.#isUnsavedChanges();
+        if (isUnsavedChanges) {
+            this.#handleUnsavedChanges(handleReviewTableClickOk);
+            return;
+        }
+
+        handleReviewTableClickOk();
+    }
+
+    #handleReviewNavClick() {
+        const handleReviewNavClickOk = () => {
+            const data = $('#submitted-regions-table').bootstrapTable('getData');
+            const tr = $('#submitted-regions-table tbody').children('tr:first');
+            this.#handleSubmittedRegionsTableCLick(data[0], tr);
+        };
+        const isUnsavedChanges = this.#isUnsavedChanges();
+        if (isUnsavedChanges) {
+            this.#handleUnsavedChanges(handleReviewNavClickOk);
+            return;
+        }
+        handleReviewNavClickOk();
+    }
+
+    #handleUnsavedChanges(callable) {
+        $('#in-progress-warning-modal').modal('show');
+
+        $('#in-progress-ok').off('click');
+        $('#in-progress-ok').on('click', () => {
+            $('#in-progress-warning-modal').modal('hide');
+            callable();
+        });
+    }
+
+    #handleLabelNewRegionClick() {
+        const handleLabelNewRegionClickOk = () => {
+            // hide update labels button and show submit button
+            $('#submit_labels').show();
+            $('#update_labels').hide();
+
+            $('#nav-label-tab').tab('show');
+            $('#submitted-regions-table tbody tr').each(_, v => {
+                v.removeClass('table-primary');
+            });
+            this.loadNewRegion();
+        }
+
+        const isUnsavedChanges = this.#isUnsavedChanges();
+        if (isUnsavedChanges) {
+            this.#handleUnsavedChanges(handleLabelNewRegionClickOk);
+            return;
+        }
+        handleLabelNewRegionClickOk();
+    }
+
+    async #updateProgress() {
+        fetch(
+        `http://localhost:${PORT}/get_label_stats`
+        )
+        .then(data => data.json())
+        .then(stats => {
+            const total = stats['n_total'];
+            const completed = stats['n_completed'];
+            const userLabeled = stats['n_user_has_labeled'];
+            const numLabelersRequiredPerRegion = stats['num_labelers_required_per_region'];
+            const totalProgress = completed / total;
+            const userProgress = userLabeled / (total - completed);
+
+            const progressHtml = `
+                <p>${userLabeled} / ${total - completed} labeled</p>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: ${userProgress * 100}%;" aria-valuenow="${userLabeled}" aria-valuemin="0" aria-valuemax="${total}"></div>
+                </div>
+                <p style="margin-top: 10px">${completed} / ${total} labeled by ${numLabelersRequiredPerRegion} labelers</p>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: ${totalProgress * 100}%;" aria-valuenow="${completed}" aria-valuemin="0" aria-valuemax="${total}"></div>
+                </div>`;
+
+            $('#progress-container').html(progressHtml);
+            }
+        );
+    }
+
+    #isUnsavedChanges() {
+        /* Check if the user made any unsaved changes */
+        const rois = this.rois
+            // Filtering out any currently selected non-cell points
+            .filter(x => x.contours !== null ||
+                   (x.point !== null && x.label === 'cell'));
+
+        if (rois.length !== this.roisUnchanged.length) {
+            return true;
+        }
+
+        return rois.some((roi, idx) => {
+            if (roi.label !== this.roisUnchanged[idx].label) {
+                return true;
+            }
+
+            if (this.notes.get(roi.id) !== this.notesUnchanged.get(roi.id)) {
+                return true;
+            }
+            return false;
+        });
     }
 }
 
