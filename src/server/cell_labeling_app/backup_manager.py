@@ -1,26 +1,26 @@
 import logging
+import logging.handlers
 import os
 import shutil
 import time
 from pathlib import Path
+from typing import Optional
 
-import flask
 import numpy as np
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import UserLabels
+from flask import Flask
 
 
 class BackupManager:
     """Backup manager"""
     def __init__(self,
-                 app: flask.Flask,
-                 log_filepath: str,
                  database_path: Path,
                  backup_dir: Path,
+                 log_file: Optional[str] = None,
                  frequency: int = 60 * 5):
         """
-        :param app
-            The flask app, in order to query db
+        :param log_file
         :param database_path
             Path to sqlite database
         :param backup_dir:
@@ -28,22 +28,33 @@ class BackupManager:
         :param frequency:
             Frequency in seconds to check if a backup should be made
         """
-        logging.basicConfig(
-            filename=log_filepath,
-            level=logging.INFO,
-            format='%(name)s: %(asctime)s %(levelname)-8s %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S',
-            force=True
-        )
+
+        self._logger = self._configure_logger(log_file=log_file)
+        app = Flask(__name__)
+        app.config['SQLALCHEMY_DATABASE_URI'] = \
+            f'sqlite:///{database_path}'
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        db.init_app(app)
 
         self._app = app
-        self._logger = logging.getLogger(__name__)
         self._database_path = database_path
         self._backup_dir = backup_dir
         self._frequency = frequency
         with self._app.app_context():
             self._num_records = self._get_num_label_records()
         os.makedirs(backup_dir, exist_ok=True)
+
+    def _configure_logger(self, log_file):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        if log_file is not None:
+            fh = logging.FileHandler(filename=log_file)
+            fh.setLevel(logging.INFO)
+            fh.setFormatter(logging.Formatter(
+                '[%(levelname)s] %(asctime)s: Backup Manager: %(message)s',
+                "%Y-%m-%d %H:%M:%S"))
+            logger.addHandler(fh)
+        return logger
 
     def run(self):
         """Checks to see if there have been new labels added since last time.

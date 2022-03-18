@@ -1,4 +1,6 @@
 import json
+import logging
+import logging.handlers
 import os
 import subprocess
 import sys
@@ -18,7 +20,7 @@ from cell_labeling_app.user_authentication.user_authentication import login
 
 class _BackupSchema(argschema.ArgSchema):
     frequency = argschema.fields.Integer(
-        default=60 * 5,
+        default=60 * 0.5,
         description='Number of seconds to wait before creating a new backup'
     )
 
@@ -103,8 +105,6 @@ class App(argschema.ArgSchemaParser):
         app.secret_key = app.config['SESSION_SECRET_KEY']
 
         login.init_app(app)
-        self._create_backup_manager(app)
-
         return app
 
     def run_production_server(self):
@@ -114,6 +114,7 @@ class App(argschema.ArgSchemaParser):
             f'--workers={self.args["num_workers"]}',
             '--capture-output',
             '--name=cell_labeling_app',
+            '--log-level=info'
             '--timeout=90'
         ]
         if self.args['ACCESS_LOG_FILE'] is not None:
@@ -138,12 +139,11 @@ class App(argschema.ArgSchemaParser):
                        stderr=sys.stderr,
                        env=os.environ)
 
-    def _create_backup_manager(self, app):
+    def create_backup_manager(self):
         """Starts a backup manager running in the background in a new thread"""
         database_path = Path(self.args['database_path'])
         backup_manager = BackupManager(
-            app=app,
-            log_filepath=self.args['LOG_FILE'],
+            log_file=self.args['LOG_FILE'],
             database_path=database_path,
             backup_dir=database_path.parent / 'backups',
             frequency=self.args['backup_params']['frequency']
@@ -162,6 +162,8 @@ def main(input_json_path: str, session_secret_key: str) -> Flask:
 
 if __name__ == '__main__':
     app = App()
+    app.create_backup_manager()
+
     if app.args['debug']:
         flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))
         flask_app.run(debug=True, port=app.args['PORT'])
