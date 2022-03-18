@@ -1272,7 +1272,7 @@ class CellLabelingApp {
                 return true;
             }
 
-            if (this.notes[roi.id] !== this.notesUnchanged[roi.id]) {
+            if (this.notes.get(roi.id) !== this.notesUnchanged.get(roi.id)) {
                 return true;
             }
             return false;
