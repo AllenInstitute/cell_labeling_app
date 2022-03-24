@@ -349,12 +349,14 @@ def get_label_stats():
     """
     user_has_labeled = get_user_has_labeled()
     completed = get_completed_regions()
+    completed_by_others = get_completed_regions(exclude_current_user=True)
     total = get_total_regions_in_labeling_job()
 
     return {
         'n_user_has_labeled': len(user_has_labeled),
         'n_total': total,
         'n_completed': len(completed),
+        'n_completed_by_others': len(completed_by_others),
         'num_labelers_required_per_region':
             current_app.config['LABELERS_REQUIRED_PER_REGION']
     }

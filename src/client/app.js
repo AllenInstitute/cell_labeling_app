@@ -1236,13 +1236,14 @@ class CellLabelingApp {
         .then(stats => {
             const total = stats['n_total'];
             const completed = stats['n_completed'];
+            const completedByOthers = stats['n_completed_by_others'];
             const userLabeled = stats['n_user_has_labeled'];
             const numLabelersRequiredPerRegion = stats['num_labelers_required_per_region'];
             const totalProgress = completed / total;
-            const userProgress = userLabeled / (total - completed);
+            const userProgress = userLabeled / (total - completedByOthers);
 
             const progressHtml = `
-                <p>${userLabeled} / ${total - completed} labeled</p>
+                <p>${userLabeled} / ${total - completedByOthers} labeled</p>
                 <div class="progress">
                     <div class="progress-bar" role="progressbar" style="width: ${userProgress * 100}%;" aria-valuenow="${userLabeled}" aria-valuemin="0" aria-valuemax="${total}"></div>
                 </div>
