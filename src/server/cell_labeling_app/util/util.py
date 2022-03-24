@@ -230,9 +230,12 @@ def get_artifacts_path(experiment_id: str):
     return artifact_path
 
 
-def get_completed_regions() -> List[int]:
+def get_completed_regions(exclude_current_user=False) -> List[int]:
     """
     This returns the regions with sufficient number of labels
+
+    :param exclude_current_user: Exclude regions where current user
+        contributed to completing it (returns regions completed by others)
     :rtype: list of string
         list of completed region ids
     """
@@ -242,9 +245,14 @@ def get_completed_regions() -> List[int]:
          .query(UserLabels.region_id,
                 func.count())
          .join(JobRegion, JobRegion.id == UserLabels.region_id)
-         .filter(JobRegion.job_id == job_id)
-         .group_by(UserLabels.region_id)
-         .all())
+         .filter(JobRegion.job_id == job_id))
+    if exclude_current_user:
+        region_label_counts = \
+            (region_label_counts
+             .filter(UserLabels.user_id != current_user.get_id()))
+    region_label_counts = region_label_counts\
+        .group_by(UserLabels.region_id)\
+        .all()
     region_label_counts = pd.DataFrame.from_records(
         region_label_counts, columns=['region_id', 'count'])
     regions_with_enough_labels = \
