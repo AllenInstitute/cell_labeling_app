@@ -187,7 +187,7 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
 
         blank = np.zeros((512, 512), dtype='uint8')
         blank[y:y + height, x:x + width] = mask
-        contours, _ = cv2.findContours(blank, cv2.RETR_EXTERNAL,
+        contours, _ = cv2.findContours(blank, cv2.RETR_TREE,
                                        cv2.CHAIN_APPROX_NONE)
         if reshape_contours_to_list:
             contours = [
