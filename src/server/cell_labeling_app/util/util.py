@@ -230,14 +230,11 @@ def get_artifacts_path(experiment_id: str):
     return artifact_path
 
 
-def get_completed_regions(exclude_current_user=False) -> List[int]:
+def get_region_label_counts(exclude_current_user: bool = False) -> pd.Series:
     """
-    This returns the regions with sufficient number of labels
-
     :param exclude_current_user: Exclude regions where current user
-        contributed to completing it (returns regions completed by others)
-    :rtype: list of string
-        list of completed region ids
+        contributed to completing it
+    :return: Series with index region_id and values n_labelers
     """
     job_id = _get_current_job_id()
     region_label_counts = \
@@ -254,12 +251,40 @@ def get_completed_regions(exclude_current_user=False) -> List[int]:
         .group_by(UserLabels.region_id)\
         .all()
     region_label_counts = pd.DataFrame.from_records(
-        region_label_counts, columns=['region_id', 'count'])
+        region_label_counts, columns=['region_id', 'n_labelers'])
+    region_label_counts = (region_label_counts.set_index('region_id')
+                           ['n_labelers'])
+
+    # Need to add the regions with 0 labels
+    unlabeled_regions = (
+        db.session
+        .query(JobRegion.id)
+        .filter(~JobRegion.id.in_(region_label_counts.index.tolist()))
+        .all()
+    )
+    unlabeled_regions = [x.id for x in unlabeled_regions]
+    unlabeled_regions = pd.Series(0, index=unlabeled_regions)
+
+    region_label_counts = pd.concat([region_label_counts, unlabeled_regions])
+
+    return region_label_counts
+
+
+def get_completed_regions(exclude_current_user: bool = False) -> List[int]:
+    """
+    This returns the regions with sufficient number of labels
+
+    :param exclude_current_user: Exclude regions where current user
+        contributed to completing it (returns regions completed by others)
+    :rtype: list of completed region ids
+    """
+    region_label_counts = get_region_label_counts(
+        exclude_current_user=exclude_current_user)
     regions_with_enough_labels = \
         region_label_counts.loc[
-            region_label_counts['count'] >=
-            current_app.config['LABELERS_REQUIRED_PER_REGION'],
-            'region_id'].tolist()
+            region_label_counts >=
+            current_app.config['LABELERS_REQUIRED_PER_REGION']]\
+        .index.tolist()
     return regions_with_enough_labels
 
 
@@ -289,14 +314,37 @@ def get_user_has_labeled() -> List[Dict]:
     return user_has_labeled
 
 
-def get_next_region() -> Optional[JobRegion]:
+def get_next_region(
+        prioritize_regions_by_label_count: bool = True
+) -> Optional[JobRegion]:
     """Samples a region randomly from a set of candidate regions.
     The candidate regions are those that have not already been labeled by the
     labeler and those that have not been labeled enough times by other
     labelers
+
+    :param prioritize_regions_by_label_count: Whether to prioritize
+        sampling regions that
+        have been labeled more times. Encourages `LABELERS_REQUIRED_PER_REGION`
+        to be met quicker for a given region
     :rtype: optional JobRegion
         JobRegion, if a candidate region exists, otherwise None
     """
+    def get_regions_prioritized_by_num_labels(
+            labelers_required_per_region: int) -> List[int]:
+        """
+
+        :param labelers_required_per_region: Number of labelers required per
+            region
+        :return: region ids which have a label count closest to
+            `labelers_required_per_region`
+        """
+        label_counts = get_region_label_counts()
+        label_counts = label_counts[
+            label_counts < labelers_required_per_region]
+        label_counts = label_counts.sort_values(ascending=False)
+        prioritized_regions = label_counts[
+            label_counts == label_counts.max()].index.tolist()
+        return prioritized_regions
     job_id = _get_current_job_id()
 
     # Get all region ids user has labeled
@@ -320,6 +368,15 @@ def get_next_region() -> Optional[JobRegion]:
 
     next_region_candidates = next_region_candidates.all()
     next_region: Optional[JobRegion]
+
+    if prioritize_regions_by_label_count and \
+            current_app.config['LABELERS_REQUIRED_PER_REGION'] is not None:
+        prioritized_regions = get_regions_prioritized_by_num_labels(
+            labelers_required_per_region=
+            current_app.config['LABELERS_REQUIRED_PER_REGION'])
+        prioritized_regions = set(prioritized_regions)
+        next_region_candidates = [x for x in next_region_candidates
+                                  if x.id in prioritized_regions]
     if not next_region_candidates:
         next_region = None
     else:

@@ -1,6 +1,6 @@
 import json
 import tempfile
-from typing import Optional
+from typing import Optional, List
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -19,7 +19,8 @@ class TestGetNextRegion:
     def setup_class(cls):
         cls.db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
 
-    def _init_db(self, labels_per_region_limit: Optional[int] = None):
+    def _init_db(self, labels_per_region_limit: Optional[int] = None,
+                 num_regions=1):
         db_fp = tempfile.NamedTemporaryFile('w', suffix='.db')
 
         app = Flask(__name__)
@@ -36,7 +37,7 @@ class TestGetNextRegion:
 
         self.user_ids = list(range(4))
         self._populate_users()
-        self._populate_labeling_job()
+        self._populate_labeling_job(num_regions=num_regions)
 
     def teardown(self):
         self.db_fp.close()
@@ -48,25 +49,26 @@ class TestGetNextRegion:
             db.session.commit()
 
     @staticmethod
-    def _populate_labeling_job():
+    def _populate_labeling_job(num_regions=1):
         job = LabelingJob()
         db.session.add(job)
 
         job_id = db.session.query(LabelingJob.job_id).order_by(desc(
             LabelingJob.date)).first()[0]
 
-        region = Region(
-            x=0,
-            y=0,
-            experiment_id='0',
-            width=10,
-            height=10
-        )
-        job_region = JobRegion(job_id=job_id,
-                               experiment_id=region.experiment_id,
-                               x=region.x, y=region.y, width=region.width,
-                               height=region.height)
-        db.session.add(job_region)
+        for _ in range(num_regions):
+            region = Region(
+                x=0,
+                y=0,
+                experiment_id='0',
+                width=10,
+                height=10
+            )
+            job_region = JobRegion(job_id=job_id,
+                                   experiment_id=region.experiment_id,
+                                   x=region.x, y=region.y, width=region.width,
+                                   height=region.height)
+            db.session.add(job_region)
         db.session.commit()
 
     @pytest.mark.parametrize('labels_per_region_limit', (None, 3))
@@ -96,4 +98,78 @@ class TestGetNextRegion:
         else:
             assert next_region.id == 1
 
+    @pytest.mark.parametrize('prioritize_regions_by_label_count',
+                             [True, False])
+    # Dummy to repeat this 10 times in case we get lucky
+    @pytest.mark.parametrize('_', range(10))
+    def test_prioritize_regions_by_label_count(
+            self, prioritize_regions_by_label_count, _):
+        self._init_db(labels_per_region_limit=3, num_regions=3)
 
+        # Region 1 gets 2 labels
+        self._add_labels(user_ids=self.user_ids[:2], region_ids=[1])
+
+        # Region 2 gets 1 label
+        self._add_labels(user_ids=self.user_ids[:1], region_ids=[2])
+
+        next_region = self._get_next_region(
+            user_id='3',
+            prioritize_regions_by_label_count=
+            prioritize_regions_by_label_count)
+
+        if prioritize_regions_by_label_count:
+            # we expect the region with
+            # more labels to be sampled
+            assert next_region.id == 1
+        else:
+            # If not prioritize_almost_finished_regions,
+            # any region can be sampled
+            assert next_region.id in (1, 2, 3)
+
+        # Region 2 gets another label
+        self._add_labels(user_ids=[self.user_ids[2]], region_ids=[2])
+
+        next_region = self._get_next_region(
+            user_id='3',
+            prioritize_regions_by_label_count=
+            prioritize_regions_by_label_count)
+
+        if prioritize_regions_by_label_count:
+            # we expect the region with
+            # more labels to be sampled (2 regions both have equal # labels)
+            assert next_region.id in (1, 2)
+        else:
+            # If not prioritize_almost_finished_regions,
+            # any region can be sampled
+            assert next_region.id in (1, 2, 3)
+
+        # Regions 1&2 gets another label
+        self._add_labels(user_ids=[self.user_ids[3]], region_ids=[1, 2])
+
+        next_region = self._get_next_region(
+            user_id='3',
+            prioritize_regions_by_label_count=
+            prioritize_regions_by_label_count)
+
+        # There's only 1 region left
+        assert next_region.id == 3
+
+    @staticmethod
+    def _get_next_region(user_id: str,
+                         prioritize_regions_by_label_count: bool) -> JobRegion:
+        with patch('cell_labeling_app.util.util.current_user') as mock_user:
+            mock_user.get_id = MagicMock(return_value=user_id)
+            next_region = get_next_region(
+                prioritize_regions_by_label_count=
+                prioritize_regions_by_label_count)
+            return next_region
+
+    @staticmethod
+    def _add_labels(user_ids: List[str], region_ids: List[int]):
+        for user_id in user_ids:
+            for region_id in region_ids:
+                user_labels = UserLabels(user_id=str(user_id),
+                                         region_id=region_id,
+                                         labels=json.dumps({}))
+                db.session.add(user_labels)
+        db.session.commit()
