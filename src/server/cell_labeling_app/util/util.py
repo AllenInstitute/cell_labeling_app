@@ -230,10 +230,13 @@ def get_artifacts_path(experiment_id: str):
     return artifact_path
 
 
-def get_region_label_counts(exclude_current_user: bool = False) -> pd.Series:
+def get_region_label_counts(
+        exclude_current_user: bool = False,
+        region_ids: Optional[List[int]] = None) -> pd.Series:
     """
     :param exclude_current_user: Exclude regions where current user
         contributed to completing it
+    :param region_ids: Optional list of region ids to get counts for
     :return: Series with index region_id and values n_labelers
     """
     job_id = _get_current_job_id()
@@ -243,6 +246,10 @@ def get_region_label_counts(exclude_current_user: bool = False) -> pd.Series:
                 func.count())
          .join(JobRegion, JobRegion.id == UserLabels.region_id)
          .filter(JobRegion.job_id == job_id))
+    if region_ids is not None:
+        region_label_counts = \
+            region_label_counts.filter(JobRegion.id.in_(region_ids))
+
     if exclude_current_user:
         region_label_counts = \
             (region_label_counts
@@ -330,15 +337,18 @@ def get_next_region(
         JobRegion, if a candidate region exists, otherwise None
     """
     def get_regions_prioritized_by_num_labels(
-            labelers_required_per_region: int) -> List[int]:
+            labelers_required_per_region: int,
+            region_ids: List[int]
+    ) -> List[int]:
         """
 
         :param labelers_required_per_region: Number of labelers required per
             region
+        :param region_ids: The region ids to prioritize
         :return: region ids which have a label count closest to
             `labelers_required_per_region`
         """
-        label_counts = get_region_label_counts()
+        label_counts = get_region_label_counts(region_ids=region_ids)
         label_counts = label_counts[
             label_counts < labelers_required_per_region]
         label_counts = label_counts.sort_values(ascending=False)
@@ -373,7 +383,9 @@ def get_next_region(
             current_app.config['LABELERS_REQUIRED_PER_REGION'] is not None:
         prioritized_regions = get_regions_prioritized_by_num_labels(
             labelers_required_per_region=
-            current_app.config['LABELERS_REQUIRED_PER_REGION'])
+            current_app.config['LABELERS_REQUIRED_PER_REGION'],
+            region_ids=[x.id for x in next_region_candidates]
+        )
         prioritized_regions = set(prioritized_regions)
         next_region_candidates = [x for x in next_region_candidates
                                   if x.id in prioritized_regions]
