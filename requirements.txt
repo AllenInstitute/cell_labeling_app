@@ -10,4 +10,4 @@ Flask-Login
 gunicorn
 SQLAlchemy~=1.4.26
 pytest~=6.2.5
-git+https://github.com/AllenInstitute/ophys_etl_pipelines@main
+ophys_etl_pipelines @ git+https://github.com/AllenInstitute/ophys_etl_pipelines@main
