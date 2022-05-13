@@ -17,6 +17,10 @@ class CellLabelingApp {
         this.fieldOfViewDims = field_of_view_dims;
         this.displayLoginMessage();
         this.addListeners();
+
+        if (isInspectorView) {
+            this.#addInspectorViewComponents();
+        }
     }
 
     addListeners() {
@@ -151,7 +155,11 @@ class CellLabelingApp {
                     color: x['color'],
                     classifier_score: x['classifier_score'],
                     label: 'not cell',
-                    contours: x['contours']
+                    contours: x['contours'],
+                    box_width: x['box_width'],
+                    box_height: x['box_height'],
+                    box_x: x['box_x'],
+                    box_y: x['box_y']
                 }));
                 rois = rois.filter(x => x.contours.length > 0);
                 this.rois = rois;
@@ -250,6 +258,8 @@ class CellLabelingApp {
 
             if (this.projection_is_shown) {
                 const layout = document.getElementById('projection').layout;
+                layout.xaxis = { range: this.fovBounds['x'] };
+                layout.yaxis = { range : this.fovBounds['y'] };
                 Plotly.react('projection', [trace1], layout);
             } else {
                 const dim = 512;
@@ -462,13 +472,15 @@ class CellLabelingApp {
         this.#updateContrastControls(contrast);
     }
 
-    async loadNewRegion(region_id = null) {
+    async loadNewRegion(region_id = null, experimentId = null) {
         /* Loads a new region
 
         Args
         ------
         - region_id:
             Load a specific region.
+        - experimentId:
+            Load a specific experiment
         */
         if (!region_id) {
             // If region id is not passed, we should be submitting,
@@ -482,7 +494,19 @@ class CellLabelingApp {
 
         let region;
         try {
-            if (region_id === null) {
+            if (experimentId) {
+                region = {
+                    'region': {
+                        'id': null,
+                        'x': 0,
+                        'y': 0,
+                        'width': 512,
+                        'height': 512
+                    },
+                    'experiment_id': experimentId
+                };
+            }
+            else if (region_id === null) {
                 // Loading a random region
                 this.#populateSubmittedRegionsTable();
                 this.#updateProgress();
@@ -510,13 +534,24 @@ class CellLabelingApp {
         this.region = region['region'];
         this.experiment_id = region['experiment_id'];
 
-        const promises = [
-            $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(region['region'])),
+        let promises = [];
+        if (!experimentId) {
+            promises.push($.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(region['region'])));
+        }
+        promises.push(
             fetch(`http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
                 ).then(data => data.json())
-        ]
+        );
 
-        const [fovBounds, motionBorder] = await Promise.all(promises);
+        let fovBounds;
+        let motionBorder;
+
+        if (!experimentId) {
+            [fovBounds, motionBorder] = await Promise.all(promises);
+        } else {
+            fovBounds = [512, 512];
+            [motionBorder] = await Promise.all(promises);
+        }
         this.fovBounds = fovBounds;
         this.motionBorder = motionBorder;
 
@@ -1279,6 +1314,85 @@ class CellLabelingApp {
             return false;
         });
     }
+
+    async #addInspectorViewComponents() {
+        const handleExperimentIdsSelect = async () => {
+            const experimentId = $('#experiment_ids_select').val();
+            await this.loadNewRegion(null, experimentId);
+
+            const roiIds = await fetch(
+                `http://localhost:${PORT}/get_roi_ids?experiment_id=${experimentId}`
+            )
+            .then(data => data.json())
+            .then(data => data['roi_ids']);
+            const roiIdsSelect = $('#roi_ids_select');
+
+            // Empty existing roi ids, then populate with new ones
+            roiIdsSelect.empty();
+
+            roiIds.forEach(roiId => {
+                roiIdsSelect.append(`<option>${roiId}</option>`);
+            });
+            roiIdsSelect.selectpicker('destroy');
+            roiIdsSelect.selectpicker();
+        }
+
+        const handleROiIdSelect = async () => {
+            const roiId = $('#roi_ids_select').val();
+            await this.#handleSegmentedPointClick({roi_id: parseInt(roiId)});
+            this.fovBounds = {
+                x: [this.selected_roi.box_x, this.selected_roi.box_x + this.selected_roi.box_width],
+                y: [this.selected_roi.box_y + this.selected_roi.box_height, this.selected_roi.box_y]
+            };
+            this.region = {
+                id: null,
+                x: this.selected_roi.box_x,
+                y: this.selected_roi.box_y,
+                width: this.selected_roi.box_width,
+                height: this.selected_roi.box_height
+            };
+            this.displayProjection();
+        };
+
+        const experimentIds = await fetch(
+            `http://localhost:${PORT}/get_experiment_ids`
+        )
+        .then(data => data.json())
+        .then(data => data['experiment_ids']);
+
+        const experimentIdsSelectOptions = experimentIds.map(experimentId => {
+           return `<option>${experimentId}</option>`;
+        }).join('\n');
+        const experimentIdsSelect = `
+            <select id="experiment_ids_select" data-live-search="true" title="Select an experiment id" class="form-control">
+            ${experimentIdsSelectOptions}
+            </select>
+        `;
+        const roiIdsSelect = `
+            <select id="roi_ids_select" data-live-search="true" title="Select an roi id" class="form-control">
+            </select>
+        `;
+        const html = `
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="experiment_ids_select"> Select an experiment id </label>
+                    ${experimentIdsSelect}
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="roi_ids_select"> Select an roi id </label>
+                    ${roiIdsSelect}
+                </div>
+            </div>
+        `;
+        $('#inspector-container').html(html);
+        $('#experiment_ids_select').selectpicker();
+        $('#roi_ids_select').selectpicker();
+
+        $('#experiment_ids_select').on('change', () => handleExperimentIdsSelect());
+        $('#roi_ids_select').on('change', () => handleROiIdSelect());
+    }
 }
 
 const getFieldOfViewDimensions = async function() {
@@ -1292,6 +1406,6 @@ const getFieldOfViewDimensions = async function() {
 
 $(document).ready(async function () {
     const field_of_view_dims = await getFieldOfViewDimensions();
-    const app = new CellLabelingApp({field_of_view_dims});
+    const app = new CellLabelingApp({field_of_view_dims, isInspectorView});
     app.loadNewRegion();
 });

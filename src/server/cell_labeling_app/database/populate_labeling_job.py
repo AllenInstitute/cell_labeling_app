@@ -15,6 +15,8 @@ from cell_labeling_app.database.schemas import LabelingJob, JobRegion
 
 from cell_labeling_app.imaging_plane_artifacts import MotionBorder
 
+from util import util
+
 FIELD_OF_VIEW_DIMENSIONS = (512, 512)
 
 logging.basicConfig(level=logging.INFO)
@@ -294,12 +296,7 @@ class RegionSampler:
     def _get_experiment_ids(self):
         """Gets the list of experiment ids to sample from from the filename
         of the hdf5 files"""
-        experiment_ids = []
-        for file in os.listdir(self._artifact_path):
-            af = ArtifactFile(self._artifact_path / file)
-            experiment_ids.append(af.experiment_id)
-        experiment_ids = sorted(experiment_ids)
-        return experiment_ids
+        return util.get_experiment_ids(artifact_path=str(self._artifact_path))
 
 
 def populate_labeling_job(regions: List[Region]):

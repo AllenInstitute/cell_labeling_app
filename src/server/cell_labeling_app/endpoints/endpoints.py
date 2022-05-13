@@ -32,6 +32,12 @@ def index():
         return render_template('login.html', port=current_app.config['PORT'])
 
 
+@api.route('/inspector')
+def inspector():
+    return render_template('index.html', port=current_app.config['PORT'],
+                           is_inspector_view=True)
+
+
 @api.route('/done.html')
 def done():
     return render_template('done.html')
@@ -41,11 +47,14 @@ def done():
 def get_roi_contours():
     experiment_id = request.args['experiment_id']
     current_region_id = request.args['current_region_id']
-    current_region_id = int(current_region_id)
+    if current_region_id != 'null':
+        current_region_id = int(current_region_id)
 
-    region = (db.session.query(JobRegion)
-              .filter(JobRegion.id == current_region_id)
-              .first())
+        region = (db.session.query(JobRegion)
+                  .filter(JobRegion.id == current_region_id)
+                  .first())
+    else:
+        region = None
     all_contours = util.get_roi_contours_in_region(experiment_id=experiment_id,
                                                    region=region)
     return {
@@ -133,7 +142,11 @@ def get_video():
     else:
         # It's a non-segmented point
         point = request_data['point']
-    region_id = int(request_data['region_id'])
+
+    if request_data['region_id'] is not None:
+        region_id = int(request_data['region_id'])
+    else:
+        region_id = None
 
     include_current_roi_mask = request_data['include_current_roi_mask']
     include_all_roi_masks = request_data['include_all_roi_masks']
@@ -142,10 +155,13 @@ def get_video():
 
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
 
-    region = (db.session.query(JobRegion)
-              .filter(JobRegion.id == region_id)
-              .first())
-    rois = util.get_rois_in_region(region=region)
+    if region_id is not None:
+        region = (db.session.query(JobRegion)
+                  .filter(JobRegion.id == region_id)
+                  .first())
+        rois = util.get_rois_in_region(region=region)
+    else:
+        rois = [util.get_roi(roi_id=roi_id, experiment_id=experiment_id)]
     roi_color_map = {
         roi['id']: util.get_soft_filter_roi_color(
             classifier_score=roi['classifier_score']) for roi in rois}
@@ -459,3 +475,31 @@ def update_labels_for_region():
     util.update_roi_extra_for_region(region_id=data['region_id'],
                                      roi_extra=data['roi_extra'])
     return 'success'
+
+
+@api.route('/get_experiment_ids', methods=['GET'])
+def get_experiment_ids():
+    """
+    Gets all experiment ids
+    :return: list of experiment ids
+    """
+    exp_ids = util.get_experiment_ids(
+        artifact_path=current_app.config['ARTIFACT_DIR'])
+    return {
+        'experiment_ids': exp_ids
+    }
+
+
+@api.route('/get_roi_ids', methods=['GET'])
+def get_roi_ids():
+    """
+    Gets ROI ids for an experiment id
+    :return: list of roi ids
+    """
+    exp_id = request.args['experiment_id']
+    af = ArtifactFile(
+        path=get_artifacts_path(experiment_id=exp_id))
+    roi_ids = [roi['id'] for roi in af.rois]
+    return {
+        'roi_ids': roi_ids
+    }

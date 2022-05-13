@@ -2,8 +2,9 @@ import base64
 import json
 import random
 from io import BytesIO
+import os
 from pathlib import Path
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Union, Any
 
 import cv2
 import matplotlib.cm
@@ -147,14 +148,15 @@ def convert_pil_image_to_base64(img: Image) -> str:
     return img_str
 
 
-def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
+def get_roi_contours_in_region(experiment_id: str,
+                               region: Optional[JobRegion] = None,
                                include_overlapping_rois=True,
                                reshape_contours_to_list=True):
     """Gets all ROI contours within a given region of the field of view.
     :param experiment_id:
         experiment id
     :param region:
-        region to get contours for
+        region to get contours for. If None, gets all contours in FOV
     :param include_overlapping_rois:
         Whether to include ROIs that overlap with region but don't fit
         entirely within region
@@ -173,8 +175,17 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
     """
     all_contours = []
 
-    rois = get_rois_in_region(
-        region=region, include_overlapping_rois=include_overlapping_rois)
+    if region is not None:
+        rois = get_rois_in_region(
+            region=region, include_overlapping_rois=include_overlapping_rois)
+    else:
+        af = ArtifactFile(path=get_artifacts_path(
+            experiment_id=experiment_id))
+        rois = af.rois
+        for roi in rois:
+            roi['classifier_score'] = _get_classifier_score_for_roi(
+                roi_id=roi['id'], experiment_id=experiment_id
+            )
 
     for roi in rois:
         x = roi['x']
@@ -529,3 +540,40 @@ def update_roi_extra_for_region(region_id: int, roi_extra: List[dict]):
         db.session.add(roi_extra)
 
     db.session.commit()
+
+
+def get_experiment_ids(artifact_path: Union[str, Path]) -> List[str]:
+    """Gets the list of experiment ids to sample from from the filename
+    of the hdf5 files"""
+    artifact_path = Path(artifact_path)
+    experiment_ids = []
+    for file in os.listdir(artifact_path):
+        af = ArtifactFile(artifact_path / file)
+        experiment_ids.append(af.experiment_id)
+    experiment_ids = sorted(experiment_ids)
+    return experiment_ids
+
+
+def get_roi(roi_id: int, experiment_id: str) -> Dict[str, Any]:
+    af = ArtifactFile(
+        path=get_artifacts_path(experiment_id=experiment_id))
+    roi = [x for x in af.rois if x['id'] == roi_id][0]
+
+    mask = roi['mask']
+    x = roi['x']
+    y = roi['y']
+    width = roi['width']
+    height = roi['height']
+    id = roi['id']
+    classifier_score = _get_classifier_score_for_roi(
+        roi_id=id, experiment_id=experiment_id)
+
+    return {
+        'mask': mask,
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
+        'id': id,
+        'classifier_score': classifier_score
+    }
