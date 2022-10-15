@@ -130,7 +130,7 @@ class App(argschema.ArgSchemaParser):
         input_json_path = sys.argv[-1]
         session_secret_key = str(uuid.uuid4())
         cmd = ['gunicorn',
-               f'src.server.cell_labeling_app.main:main('
+               f'cell_labeling_app.main:main('
                f'input_json_path="{input_json_path}", '
                f'session_secret_key="{session_secret_key}")']
 
