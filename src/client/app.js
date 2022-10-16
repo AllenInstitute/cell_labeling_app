@@ -489,7 +489,7 @@ class CellLabelingApp {
                 region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
                     if (data['region'] === null) {
                         // No more regions to label
-                        window.location = `http://${SERVER_ADDRESS}:${PORT}/done.html`;
+                        window.location = `http://${SERVER_ADDRESS}/done.html`;
                     }
                 });
             } else {
