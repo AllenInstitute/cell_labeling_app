@@ -98,7 +98,7 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://localhost:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`;
+        const url = `http://${SERVER_ADDRESS}:${PORT}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`;
 
         return $.get(url, data => {
             const trace = {
@@ -143,7 +143,7 @@ class CellLabelingApp {
 
         if (rois === null) {
             $("#projection_include_mask_outline").attr("disabled", true);
-            const url = `http://localhost:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
+            const url = `http://${SERVER_ADDRESS}:${PORT}/get_roi_contours?experiment_id=${this.experiment_id}&current_region_id=${this.region['id']}`;
             await $.get(url, data => {
                 rois = data['contours'].map(x => new ROI({
                     id: x['id'],
@@ -227,7 +227,7 @@ class CellLabelingApp {
         $('#projection_contrast_label').text(`Contrast: 100%`);
 
         const projection_type = $('#projection_type').children("option:selected").val();
-        const url = `http://localhost:${PORT}/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
+        const url = `http://${SERVER_ADDRESS}:${PORT}/get_projection?type=${projection_type}&experiment_id=${this.experiment_id}`;
         return fetch(url).then(async data => {
             const blob = await data.blob();
             data = await bytesToMatrix(blob);
@@ -319,14 +319,14 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://localhost:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`)
+            videoTimeframe = await fetch(`http://${SERVER_ADDRESS}:${PORT}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`)
                 .then(async data => await data.json())
                 .then(data => data['timeframe']);
         }
 
         videoTimeframe = [parseInt(videoTimeframe[0]), parseInt(videoTimeframe[1])]
 
-        const url = `http://localhost:${PORT}/get_video`;
+        const url = `http://${SERVER_ADDRESS}:${PORT}/get_video`;
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.selected_roi.id,
@@ -486,7 +486,7 @@ class CellLabelingApp {
                 // Loading a random region
                 this.#populateSubmittedRegionsTable();
                 this.#updateProgress();
-                region = await $.get(`http://localhost:${PORT}/get_random_region`, data => {
+                region = await $.get(`http://${SERVER_ADDRESS}:${PORT}/get_random_region`, data => {
                     if (data['region'] === null) {
                         // No more regions to label
                         window.location = `http://${SERVER_ADDRESS}/done.html`;
@@ -494,7 +494,7 @@ class CellLabelingApp {
                 });
             } else {
                 // Loading a specific region
-                region = await fetch(`http://localhost:${PORT}/get_region?region_id=${region_id}`)
+                region = await fetch(`http://${SERVER_ADDRESS}:${PORT}/get_region?region_id=${region_id}`)
                     .then(res => res.json());
             }
         } catch (e) {
@@ -511,8 +511,8 @@ class CellLabelingApp {
         this.experiment_id = region['experiment_id'];
 
         const promises = [
-            $.post(`http://localhost:${PORT}/get_fov_bounds`, JSON.stringify(region['region'])),
-            fetch(`http://localhost:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
+            $.post(`http://${SERVER_ADDRESS}:${PORT}/get_fov_bounds`, JSON.stringify(region['region'])),
+            fetch(`http://${SERVER_ADDRESS}:${PORT}/get_motion_border?experiment_id=${this.experiment_id}`
                 ).then(data => data.json())
         ]
 
@@ -568,9 +568,9 @@ class CellLabelingApp {
 
         let url;
         if (isUpdate) {
-            url = `http://localhost:${PORT}/update_labels_for_region`;
+            url = `http://${SERVER_ADDRESS}:${PORT}/update_labels_for_region`;
         } else {
-            url = `http://localhost:${PORT}/submit_region`;
+            url = `http://${SERVER_ADDRESS}:${PORT}/submit_region`;
         }
 
         return $.post(url, JSON.stringify(data))
@@ -699,7 +699,7 @@ class CellLabelingApp {
         postData = JSON.stringify(postData);
 
 
-        const res = await fetch(`http://localhost:${PORT}/find_roi_at_coordinates`,
+        const res = await fetch(`http://${SERVER_ADDRESS}:${PORT}/find_roi_at_coordinates`,
             {
                 method: 'POST',
                 headers: {
@@ -1134,7 +1134,7 @@ class CellLabelingApp {
             const region_id = row['region_id'];
 
             const promises = [
-                fetch(`http://localhost:${PORT}/get_labels_for_region?region_id=${region_id}`)
+                fetch(`http://${SERVER_ADDRESS}:${PORT}/get_labels_for_region?region_id=${region_id}`)
                     .then(res => res.json()),
                 this.loadNewRegion(region_id)
             ];
@@ -1230,7 +1230,7 @@ class CellLabelingApp {
 
     async #updateProgress() {
         fetch(
-        `http://localhost:${PORT}/get_label_stats`
+        `http://${SERVER_ADDRESS}:${PORT}/get_label_stats`
         )
         .then(data => data.json())
         .then(stats => {
@@ -1283,7 +1283,7 @@ class CellLabelingApp {
 
 const getFieldOfViewDimensions = async function() {
         const field_of_view_dims = await fetch(
-            `http://localhost:${PORT}/get_field_of_view_dimensions`
+            `http://${SERVER_ADDRESS}:${PORT}/get_field_of_view_dimensions`
         )
             .then(data => data.json())
             .then(data => data['field_of_view_dimensions']);
