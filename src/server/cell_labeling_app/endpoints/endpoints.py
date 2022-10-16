@@ -27,9 +27,17 @@ api = Blueprint(name='api', import_name=__name__)
 @api.route('/')
 def index():
     if current_user.is_authenticated:
-        return render_template('index.html', port=current_app.config['PORT'])
+        return render_template(
+            'index.html',
+            port=current_app.config['PORT'],
+            server_address=current_app.config['server_address']
+        )
     else:
-        return render_template('login.html', port=current_app.config['PORT'])
+        return render_template(
+            'login.html',
+            port=current_app.config['PORT'],
+            server_address=current_app.config['server_address']
+        )
 
 
 @api.route('/done.html')

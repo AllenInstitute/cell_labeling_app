@@ -43,6 +43,11 @@ class AppSchema(argschema.ArgSchema):
         default=5000,
         description='Port the app should run on'
     )
+    server_address = argschema.fields.String(
+        default='localhost',
+        description='server address. Should be domain name if running in '
+                    'production, i.e. ece-...compute.amazonaws.com'
+    )
     FIELD_OF_VIEW_DIMENSIONS = argschema.fields.Tuple(
         (argschema.fields.Int, argschema.fields.Int),
         default=(512, 512),

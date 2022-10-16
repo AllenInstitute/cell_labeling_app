@@ -10,7 +10,11 @@ users = Blueprint(name='users', import_name=__name__, url_prefix='/users')
 
 @users.route('/register.html')
 def load_register_page():
-    return render_template('register.html', port=current_app.config['PORT'])
+    return render_template(
+        'register.html',
+        port=current_app.config['PORT'],
+        server_address=current_app.config['server_address']
+    )
 
 
 @users.route('/register', methods=['POST'])
