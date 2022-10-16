@@ -94,7 +94,7 @@ class App(argschema.ArgSchemaParser):
 
         """
         template_dir = (
-                    Path(__file__).parent.parent.parent / 'client').resolve()
+                    Path(__file__).parent / 'client').resolve()
         static_dir = template_dir
         app = Flask(__name__, static_folder=static_dir,
                     template_folder=str(template_dir))
