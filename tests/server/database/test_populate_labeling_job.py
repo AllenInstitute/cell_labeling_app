@@ -90,6 +90,25 @@ class TestPopulateLabelingJob:
                                    motion_border=motion_border,
                                    fov_divisor=fov_divisor)
 
+    def test_regions_sampled_without_replacement(self):
+        """tests that regions are sampled without replacement"""
+        with patch.object(RegionSampler,
+                          '_sample_experiments',
+                          return_value=(1,)), \
+             patch.object(RegionSampler,
+                          '_retrieve_depths',
+                          return_value=MagicMock(spec=pd.DataFrame)):
+            sampler = RegionSampler(num_experiments=1,
+                                    num_regions_per_exp=256**2,
+                                    fov_divisor=256,
+                                    db_url='',
+                                    artifact_path=self.artifacts_path.name)
+            regions = sampler.sample()
+        region_metas = [(region.x, region.y, region.width, region.height)
+                        for region in regions]
+        assert len(set(region_metas)) == len(region_metas)
+
+
     @pytest.mark.parametrize('fov_divisor', (1, 2, 4))
     @pytest.mark.parametrize('exclude_motion_border', (True, False))
     def test_get_all_regions_for_experiment(self, fov_divisor,
