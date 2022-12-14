@@ -1,6 +1,6 @@
 import json
 from io import BytesIO
-from typing import List
+from typing import List, Dict
 
 import cv2
 import numpy as np
@@ -17,7 +17,7 @@ from cell_labeling_app.database.schemas import JobRegion, \
 from cell_labeling_app.util import util
 from cell_labeling_app.util.util import get_artifacts_path, \
     get_user_has_labeled, get_completed_regions, \
-    get_total_regions_in_labeling_job
+    get_total_regions_in_labeling_job, create_roi_from_contours
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from cell_labeling_app.util.util import get_next_region
 
@@ -98,9 +98,14 @@ def get_projection():
         mimetype='image/png')
 
 
-@api.route('/get_trace')
+@api.route('/get_trace', methods=['POST'])
 def get_trace():
-    trace = _get_trace(request=request)
+    request_data = request.get_json(force=True)
+    trace = util.get_trace(
+        experiment_id=request_data['experiment_id'],
+        roi_id=request_data['roi']['id'],
+        contours=request_data['roi']['contours'],
+        is_user_added=request_data['roi']['isUserAdded'])
 
     # Trace seems to decrease to 0 at the end which makes visualization worse
     # Trim to last nonzero index
@@ -132,15 +137,11 @@ def get_motion_border():
 def get_video():
     request_data = request.get_json(force=True)
     experiment_id = request_data['experiment_id']
-    is_segmented = request_data['is_segmented']
+    is_user_added = request_data['is_user_added']
     color = request_data['color']
     roi_id = request_data['roi_id']
+    contours = request_data['contours']
 
-    if is_segmented:
-        point = None
-    else:
-        # It's a non-segmented point
-        point = request_data['point']
     region_id = int(request_data['region_id'])
 
     include_current_roi_mask = request_data['include_current_roi_mask']
@@ -157,19 +158,13 @@ def get_video():
     roi_color_map = {
         roi['id']: util.get_soft_filter_roi_color(
             classifier_score=roi['classifier_score']) for roi in rois}
-    if not is_segmented:
-        # Add the point to the list of rois
-        radius = 4
-        mask = _create_circle_mask_for_nonsegmented_point(
-                point=point, radius=radius)
-        rois.append({
-            'id': roi_id,
-            'x': point[0]-radius,
-            'y': point[1]-radius,
-            'width': len(mask[1]),
-            'height': len(mask[0]),
-            'mask': mask
-        })
+    if is_user_added:
+        roi = create_roi_from_contours(contours=contours)
+        roi['id'] = roi_id
+
+        # Add the user-drawn roi to the list of rois
+        rois.append(roi)
+
         # Add a color
         roi_color_map[roi_id] = color
 
@@ -194,9 +189,14 @@ def get_video():
     return send_file(path_or_file=video.video_path)
 
 
-@api.route('/get_default_video_timeframe')
+@api.route('/get_default_video_timeframe', methods=['POST'])
 def get_default_video_timeframe():
-    trace = _get_trace(request=request)
+    request_data = request.get_json(force=True)
+    trace = util.get_trace(
+        experiment_id=request_data['experiment_id'],
+        roi_id=request_data['roi']['id'],
+        contours=request_data['roi']['contours'],
+        is_user_added=request_data['roi']['isUserAdded'])
 
     max_idx = trace.argmax()
     start = float(max_idx - 300)
@@ -375,48 +375,6 @@ def after_request(response):
     header = response.headers
     header['Access-Control-Allow-Origin'] = '*'
     return response
-
-
-def _get_trace(request: Request) -> np.ndarray:
-    """
-
-    :param request: The flask request
-    :return:
-        trace, np.ndarray, or none if non-computed trace
-        is requested """
-    experiment_id = request.args['experiment_id']
-    roi_id = request.args['roi_id']
-    is_segmented = request.args['is_segmented'] == 'true'
-    if is_segmented:
-        point = None
-    else:
-        # It is a non-segmented point, rather than a segmented ROI
-        point = [int(x) for x in roi_id.split(',')]
-    trace = util.get_trace(experiment_id=experiment_id,
-                           roi_id=roi_id, point=point)
-    return trace
-
-
-def _create_circle_mask_for_nonsegmented_point(
-        point: List[int],
-        radius=8,
-        image_dims=(512, 512)):
-    """
-    Returns a circular mask that can be displayed on video for a point.
-    :param point:
-        Center location of circle
-    :param radius:
-        Radius of circle
-    :param image_dims:
-        Dimensions of image
-    :return:
-        Boolean mask as required by VideoGenerator for drawing contours
-    """
-    x = np.zeros(image_dims, dtype='uint8')
-    x = cv2.circle(x, point, radius, [255, 255, 255])
-    center_x, center_y = point
-    return x[center_y - radius:center_y + radius+1,
-             center_x - radius:center_x + radius+1].astype(bool).tolist()
 
 
 @api.route('/get_user_submitted_labels')

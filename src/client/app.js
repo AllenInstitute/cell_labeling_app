@@ -106,9 +106,18 @@ class CellLabelingApp {
     }
 
     displayTrace() {
-        const url = `http://${SERVER_ADDRESS}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`;
-
-        return $.get(url, data => {
+        return fetch(`http://${SERVER_ADDRESS}/get_trace`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                experiment_id: this.experiment_id,
+                roi: this.selected_roi
+            })
+        }).then(async response => await response.json())
+        .then(data => {
             const trace = {
                 x: _.range(data['trace'].length),
                 y: data['trace']
@@ -336,8 +345,17 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://${SERVER_ADDRESS}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`)
-                .then(async data => await data.json())
+            videoTimeframe = await fetch(`http://${SERVER_ADDRESS}/get_default_video_timeframe`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        experiment_id: this.experiment_id,
+                        roi: this.selected_roi
+                    })
+                }).then(async response => await response.json())
                 .then(data => data['timeframe']);
         }
 
@@ -347,14 +365,14 @@ class CellLabelingApp {
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.selected_roi.id,
-            point: this.selected_roi.point,
             color: this.selected_roi.color,
             region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
             timeframe: videoTimeframe,
-            is_segmented: this.selected_roi.contours !== null,
+            is_user_added: this.selected_roi.isUserAdded,
+            contours: this.selected_roi.contours
         };
         return $.ajax({
             xhrFields: {
@@ -709,8 +727,8 @@ class CellLabelingApp {
 
         const contours = this.#getContoursFromSVGPath(userAddedShape.path);
 
-        // Assigning a new roi id that is 1 greater than max
-        const roiId = Math.max(...this.rois.map(x => x.id)) + 1;
+        // Assigning a new roi id that is greater than max
+        const roiId = Math.max(...this.rois.map(x => x.id)) + 100;
 
         this.rois.push(new ROI({
             id: roiId,
@@ -921,7 +939,7 @@ class CellLabelingApp {
             $('#roi-sidenav #roi-label').css('color', 'black');
         }
 
-        if (this.selected_roi.contours !== null) {
+        if (!this.selected_roi.isUserAdded) {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
             $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         }
