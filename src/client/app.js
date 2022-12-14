@@ -788,6 +788,7 @@ class CellLabelingApp {
         let postData = {
             current_region_id: this.region['id'],
             roi_ids: this.rois.map(roi => roi.id),
+            user_added_rois: this.rois.filter(x => x.isUserAdded),
             coordinates: [x, y]
         }
         postData = JSON.stringify(postData);
@@ -840,70 +841,6 @@ class CellLabelingApp {
         this.#updateSideNav();
 
         // Redraw the contours
-        await this.updateShapesOnProjection();
-    }
-
-    async #handleNonSegmentedPointClick({x, y} = {}) {
-        /* Handles when the user clicks on a point that has no computed boundary 
-        Args
-        ------
-        - x: x coordinate in fov of click
-        - y: y coordinate in fov of click
-        */
-
-        // Checking if clicked point is outside requested region
-        // Note x and y swapped due to image coordinates
-        if (x < this.region.y || x > this.region.y + this.region.height ||
-            y < this.region.x || y > this.region.x + this.region.width) {
-            const msg = 'The clicked point is outside of the requested region';
-            displayTemporaryAlert({msg, type: 'danger'});
-            return;
-        }
-        const isClose = (point1, point2) => {
-            /* Returns true if the newly selected point is 
-            close to the currently selected point 
-        
-            Args
-            -----
-            */
-            const [x1, y1] = point1;
-            const [x2, y2] = point2;
-            const distance = Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-            return distance <= 4;
-        }
-        const closePointIdx = this.rois
-            .findIndex(roi => roi.point !== null &&
-                isClose(roi.point, [x, y]));
-        let selectedRoi;
-        if (closePointIdx >= 0) {
-            // Clicking on a point that already exists
-            selectedRoi = this.rois[closePointIdx];
-            if (this.rois[closePointIdx].label === 'cell') {
-                this.rois[closePointIdx].label = 'not cell';
-                this.rois[closePointIdx].color = [255, 255, 255]
-            } else {
-                this.rois[closePointIdx].label = 'cell';
-                this.rois[closePointIdx].color = [255, 0, 0]
-            }
-
-        } else {
-            // Clicking on a new point
-            selectedRoi = new ROI({
-                id: `${x},${y}`,
-                experiment_id: this.experiment_id,
-                color: [255, 255, 255],
-                label: 'not cell',
-                point: [x, y]
-            });
-            this.rois.push(selectedRoi);
-        }
-
-        this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
-
-        this.selected_roi = selectedRoi;
-
-        this.resetSideNav();
-        this.#updateSideNav();
         await this.updateShapesOnProjection();
     }
 

@@ -317,6 +317,14 @@ def find_roi_at_coordinates():
     af = ArtifactFile(path=artifact_path)
     rois = af.rois
 
+    # Add user-added rois to list of rois
+    for roi in data['user_added_rois']:
+        roi_id = roi['id']
+        roi = create_roi_from_contours(contours=roi['contours'])
+        roi['id'] = roi_id
+        rois.append(roi)
+        rois_in_region.append(roi_id)
+
     # 1) First limit candidate rois to rois in region
     rois = [x for x in rois if x['id'] in rois_in_region]
 
