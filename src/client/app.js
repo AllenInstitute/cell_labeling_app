@@ -760,17 +760,27 @@ class CellLabelingApp {
 
         if(userAddedROIs.length > userAddedShapes.length) {
             // The user deleted an ROI
-            this.handleDeleteROI(userAddedROIs, userAddedShapes);
+            this.handleDeleteROI();
         } else {
             // The user might have modified an ROI
             this.handleMaybeROIModified();
         }
     }
 
-    handleDeleteROI(userAddedROIs, userAddedShapes) {
+    handleDeleteROI() {
         /*
-        Checks which ROI was deleted
+        Checks which ROI shape was deleted and deletes it from the set of rois
          */
+        const shapes = document.getElementById('projection').layout.shapes;
+        const userAddedShapes = shapes.filter(x => x.editable);
+        const userAddedROIs = this.rois.filter(roi => roi.isUserAdded);
+
+        const userAddedShapeRoiIds = new Set(userAddedShapes.map(x => x.roiId));
+
+        const deletedRoiId = userAddedROIs.find(
+            x => !userAddedShapeRoiIds.has(x.id));
+        this.rois = this.rois.filter(x => x.id !== deletedRoiId.id);
+
     }
 
     handleMaybeROIModified() {
@@ -1355,21 +1365,17 @@ class CellLabelingApp {
          */
         const domShapes = document.getElementById('projection').layout.shapes;
         let clickedContours = this.#getContoursFromSVGPath(domShapes[idx].path);
+        const userAddedRois = this.rois.filter(x => x.isUserAdded);
 
-        // Only expect single set of contours (not disconnected)
-        clickedContours = clickedContours[0];
+        const clickedRoi = userAddedRois.find(roi => {
 
-        const clickedRoi = this.rois.find(roi => {
-            // Only expect single set of contours (not disconnected)
-            const roiContours = roi.contours[0];
-
-            if (clickedContours.length !== roiContours.length) {
+            if (clickedContours[0].length !== roi.contours[0].length) {
                 return false;
             }
-            roiContours.forEach((coords, coord_idx) => {
+            roi.contours.forEach((coords, coord_idx) => {
                 const [x, y] = coords;
-                if ((clickedContours[coord_idx][0] !== x) ||
-                    (clickedContours[coord_idx][1] !== y)) {
+                if ((clickedContours[0][coord_idx][0] !== x) ||
+                    (clickedContours[0][coord_idx][1] !== y)) {
                     return false;
                 }
             });
