@@ -83,7 +83,7 @@ class CellLabelingApp {
 
         $('#in-progress-no, #in-progress-modal-close').on('click', () => {
             $('#in-progress-warning-modal').modal('hide');
-        })
+        });
     }
 
     addProjectionListeners() {
@@ -723,7 +723,9 @@ class CellLabelingApp {
         const shapes = document.getElementById('projection').layout.shapes;
 
         // Get user-added shape
-        const userAddedShape = shapes[shapes.length - 1];
+        const userAddedshapeIndex = shapes.findLastIndex(x => x.editable);
+
+        const userAddedShape = shapes[userAddedshapeIndex];
 
         const contours = this.#getContoursFromSVGPath(userAddedShape.path);
 
@@ -748,7 +750,6 @@ class CellLabelingApp {
         );
 
         this.#handleSegmentedPointClick({roi_id: roiId});
-
     }
 
     handleProjectionRelayout(projectionShapes) {
@@ -876,7 +877,9 @@ class CellLabelingApp {
             $('#roi-sidenav #roi-label').css('color', 'black');
         }
 
-        if (!this.selected_roi.isUserAdded) {
+        if (this.selected_roi.isUserAdded) {
+            $('#roi-sidenav #roi-classifier-score').text('');
+        } else {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
             $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
         }
@@ -1069,19 +1072,6 @@ class CellLabelingApp {
         });
     }
 
-    removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
-        if (this.selected_roi !== null &&
-            this.selected_roi.contours === null &&
-            this.selected_roi.label === 'not cell' &&
-            this.selected_roi.id !== selectedRoi.id) {
-            // If we had an ROI selected and it is not a cell,
-            // and it is a nonsegmented point,
-            // and it is not the current roi,
-            // remove it
-            this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
-        }
-    }
-
     async updateShapesOnProjection() {
         const contours = await this.getRoiContourShapes();
         const points = this.getRoiPointShapes();
@@ -1090,6 +1080,19 @@ class CellLabelingApp {
         const shapes = [...contours, ...points, regionBoundary,
             ...motionBorder];
         Plotly.relayout('projection', {'shapes': shapes});
+
+        // Add listener for clicking the stroke (exterior) of editable shapes,
+        // Since plotly_click event is not triggered in that case
+        shapes
+            .map((x, idx) => x.editable ? idx : -1)
+            .filter(idx => idx > 0)
+            .forEach(idx => {
+                d3.select(`.shapelayer path:nth-child(${idx+1})`)
+                .attr('pointer-events', 'stroke')
+                .on('click', () => {
+                    this.handleUserDrawnSegmentationOutlineClick(idx);
+                });
+            });
     }
 
     async #populateSubmittedRegionsTable() {
@@ -1323,6 +1326,43 @@ class CellLabelingApp {
             return [x, y];
         });
         return [contours];
+    }
+
+    handleUserDrawnSegmentationOutlineClick(idx) {
+        /*
+        When the outline of an editable, user-drawn shape is clicked,
+        we need to handle it differently than when clicking the interior of the
+        shape, since plotly doesn't trigger the plotly_click event in this case.
+
+        This figures out which ROI was clicked by comparing the clicked
+        contours to all roi contours to figure out which one was clicked.
+
+        idx: index of the clicked shape
+         */
+        const domShapes = document.getElementById('projection').layout.shapes;
+        let clickedContours = this.#getContoursFromSVGPath(domShapes[idx].path);
+
+        // Only expect single set of contours (not disconnected)
+        clickedContours = clickedContours[0];
+
+        const clickedRoi = this.rois.find(roi => {
+            // Only expect single set of contours (not disconnected)
+            const roiContours = roi.contours[0];
+
+            if (clickedContours.length !== roiContours.length) {
+                return false;
+            }
+            roiContours.forEach((coords, coord_idx) => {
+                const [x, y] = coords;
+                if ((clickedContours[coord_idx][0] !== x) ||
+                    (clickedContours[coord_idx][1] !== y)) {
+                    return false;
+                }
+            });
+            return true;
+        })
+        const roiId = clickedRoi.id;
+        this.#handleSegmentedPointClick({roi_id: roiId});
     }
 }
 
