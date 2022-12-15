@@ -99,8 +99,8 @@ class CellLabelingApp {
            this.handleDrawSegmentationOutline();
         });
 
-        projection.on('plotly_relayout', data => {
-            this.handleProjectionRelayout(data.shapes);
+        projection.on('plotly_relayout', () => {
+            this.handleProjectionRelayout();
         });
 
     }
@@ -226,7 +226,8 @@ class CellLabelingApp {
                     width: line_width,
                     color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
                 },
-                editable: rois[i].isUserAdded
+                editable: rois[i].isUserAdded,
+                roiId: rois[i].id
             }
         });
     }
@@ -753,12 +754,9 @@ class CellLabelingApp {
     }
 
     handleProjectionRelayout(projectionShapes) {
-        if(projectionShapes === undefined) {
-            // Not the result of a shape modification
-            return;
-        }
+        const shapes = document.getElementById('projection').layout.shapes;
         const userAddedROIs = this.rois.filter(roi => roi.isUserAdded);
-        const userAddedShapes = projectionShapes.filter(x => x.editable);
+        const userAddedShapes = shapes.filter(x => x.editable);
 
         if(userAddedROIs.length > userAddedShapes.length) {
             // The user deleted an ROI
@@ -776,6 +774,22 @@ class CellLabelingApp {
     }
 
     handleMaybeROIModified() {
+        /*
+        Updates contours of roi in case the currently selected roi
+        had its vertices updated
+         */
+        if (this.selected_roi !== null) {
+            const maybeModifiedShape =
+                document.getElementById('projection').layout.shapes
+                .find(x => x.hasOwnProperty('roiId') &&
+                    x.roiId === this.selected_roi.id);
+            if (maybeModifiedShape !== undefined) {
+                const roiIdx = this.rois.findIndex(
+                    x => x.id === this.selected_roi.id);
+                this.rois[roiIdx].contours = this.#getContoursFromSVGPath(
+                    maybeModifiedShape.path)
+            }
+        }
 
     }
 
