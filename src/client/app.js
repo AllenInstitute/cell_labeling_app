@@ -561,14 +561,11 @@ class CellLabelingApp {
             region_id: this.region['id'],
             labels:
                 this.rois
-                    // Filtering out any currently selected non-cell points
-                    .filter(x => x.contours !== null ||
-                        (x.point !== null && x.label === 'cell'))
                     .map(x => {
                         return {
                             roi_id: x.id,
-                            is_segmented: x.contours !== null,
-                            point: x.point,
+                            is_user_added: x.isUserAdded,
+                            contours: x.isUserAdded ? x.contours : null,
                             label: x.label
                         }
                     }),
