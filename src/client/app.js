@@ -846,7 +846,11 @@ class CellLabelingApp {
                 .map(x => x.id)
         );
 
-        if (this.selected_roi !== null && this.selected_roi.id === selectedRoi.id) {
+        if (this.selected_roi !== null &&
+            this.selected_roi.id === selectedRoi.id &&
+            // don't toggle label on user added ROI
+            !this.selected_roi.isUserAdded
+        ) {
             const idx = this.rois.findIndex(x => x.id === selectedRoi.id);
             // Clicking the currently selected ROI again
             if (cell_roi_ids.has(selectedRoi.id)) {
