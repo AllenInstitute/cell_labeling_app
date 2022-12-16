@@ -437,32 +437,6 @@ class CellLabelingApp {
         return Promise.all(artifactLoaders);
     }
 
-    getRoiPointShapes(radius = 2) {
-        let rois;
-        if (!this.show_current_region_roi_contours_on_projection) {
-            rois = [];
-        } else {
-            rois = this.rois;
-        }
-        const points = rois
-            // Filter out all segmented ROIs to leave just the points
-            .filter(x => x.contours === null)
-            .map(roi => {
-                const [x, y] = roi.point;
-                return {
-                    type: 'circle',
-                    opacity: 1.0,
-                    fillcolor: `rgb(${roi.color.join(',')})`,
-                    x0: x - radius,
-                    x1: x + radius,
-                    y0: y - radius,
-                    y1: y + radius
-                }
-
-            });
-        return points;
-    }
-
     initialize() {
         this.show_current_region_roi_contours_on_projection = $('#projection_include_mask_outline').is(':checked');
         this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
@@ -1102,10 +1076,9 @@ class CellLabelingApp {
 
     async updateShapesOnProjection() {
         const contours = await this.getRoiContourShapes();
-        const points = this.getRoiPointShapes();
         const regionBoundary = this.getRegionBoundariesShape();
         const motionBorder = await this.getMotionBorderShape();
-        const shapes = [...contours, ...points, regionBoundary,
+        const shapes = [...contours, regionBoundary,
             ...motionBorder];
         Plotly.relayout('projection', {'shapes': shapes});
 
