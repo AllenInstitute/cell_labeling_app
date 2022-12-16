@@ -704,6 +704,11 @@ class CellLabelingApp {
 
         const contours = this.#getContoursFromSVGPath(userAddedShape.path);
 
+        if (this.isUserDrawnROIOutsideRegion(contours)) {
+            this.updateShapesOnProjection();
+            return;
+        }
+
         // Assigning a new roi id that is greater than max
         const roiId = Math.max(...this.rois.map(x => x.id)) + 100;
 
@@ -1345,6 +1350,22 @@ class CellLabelingApp {
         const domShapes = document.getElementById('projection').layout.shapes;
         const clickedRoi = this.rois.find(x => x.id === domShapes[idx].roiId);
         this.#handleSegmentedPointClick({roi_id: clickedRoi.id});
+    }
+
+    isUserDrawnROIOutsideRegion(contours) {
+        /*
+        Returns whether contours lie outside region
+         */
+        contours = contours[0];
+
+        return contours.every(coord => {
+            const [x, y] = coord;
+            // Note region x and y swapped because of array coordinates
+            // (not image coordinates)
+            return (
+                (x < this.region.y || x > this.region.y + this.region.width) ||
+                (y < this.region.x || y > this.region.x + this.region.height));
+        });
     }
 }
 
