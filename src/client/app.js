@@ -156,6 +156,9 @@ class CellLabelingApp {
             // If we are in the state of reviewing ROIs with labels
             // that disagree with the classifier
             rois = this.discrepancy_rois;
+            // Add all user-added rois
+            this.rois.filter(x => x.isUserAdded)
+                .forEach(roi => rois.push(roi));
         }
 
         if (rois === null) {
