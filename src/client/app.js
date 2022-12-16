@@ -1148,6 +1148,14 @@ class CellLabelingApp {
     }
 
     async #handleSubmittedRegionsTableCLick(row, tr) {
+        /*
+        At this point, shapes are already drawn onto projection
+        and all ROIs already loaded into memory.
+        This updates labels and adds any user added ROIs
+
+        - row: row metadata
+        - tr: row dom node
+         */
         const handleReviewTableClickOk = async () => {
             // hide submit labels button and show update button
             $('#submit_labels').hide();
@@ -1187,15 +1195,16 @@ class CellLabelingApp {
                 roi.label = roiId_label_map.get(roi.id)
             });
 
-            // add any non-segmented points
+            // add any user-added ROIs
             labels.forEach(label => {
-                if (label.point) {
+                if (label.is_user_added) {
                     this.rois.push(new ROI({
                         id: label.roi_id,
                         experiment_id: this.experiment_id,
                         color: [255, 0, 0],
                         label: 'cell',
-                        point: label.point
+                        isUserAdded: label.is_user_added,
+                        contours: label.contours
                     }));
                 }
             });
