@@ -1354,35 +1354,11 @@ class CellLabelingApp {
 
     handleUserDrawnSegmentationOutlineClick(idx) {
         /*
-        When the outline of an editable, user-drawn shape is clicked,
-        we need to handle it differently than when clicking the interior of the
-        shape, since plotly doesn't trigger the plotly_click event in this case.
-
-        This figures out which ROI was clicked by comparing the clicked
-        contours to all roi contours to figure out which one was clicked.
-
-        idx: index of the clicked shape
+        Finds the ROI belonging to the clicked shape at `idx`
          */
         const domShapes = document.getElementById('projection').layout.shapes;
-        let clickedContours = this.#getContoursFromSVGPath(domShapes[idx].path);
-        const userAddedRois = this.rois.filter(x => x.isUserAdded);
-
-        const clickedRoi = userAddedRois.find(roi => {
-
-            if (clickedContours[0].length !== roi.contours[0].length) {
-                return false;
-            }
-            roi.contours.forEach((coords, coord_idx) => {
-                const [x, y] = coords;
-                if ((clickedContours[0][coord_idx][0] !== x) ||
-                    (clickedContours[0][coord_idx][1] !== y)) {
-                    return false;
-                }
-            });
-            return true;
-        })
-        const roiId = clickedRoi.id;
-        this.#handleSegmentedPointClick({roi_id: roiId});
+        const clickedRoi = this.rois.find(x => x.id === domShapes[idx].roiId);
+        this.#handleSegmentedPointClick({roi_id: clickedRoi.id});
     }
 }
 
