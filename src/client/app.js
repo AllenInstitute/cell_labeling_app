@@ -103,6 +103,15 @@ class CellLabelingApp {
             this.handleProjectionRelayout();
         });
 
+        // Enable event listeners that require focus on canvas
+        projection.tabIndex = 1000;
+
+        projection.addEventListener('keyup', event => {
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                this.handleDeleteKeyPressOnProjection();
+            }
+        });
+
     }
 
     displayTrace() {
@@ -759,7 +768,18 @@ class CellLabelingApp {
         const deletedRoiId = userAddedROIs.find(
             x => !userAddedShapeRoiIds.has(x.id));
         this.rois = this.rois.filter(x => x.id !== deletedRoiId.id);
+        this.selected_roi = null;
+        this.#updateSideNav();
 
+    }
+
+    async handleDeleteKeyPressOnProjection() {
+        if (this.selected_roi !== null && this.selected_roi.isUserAdded) {
+            // ROI selected and it is editable
+            document.querySelector(
+                    'a[data-title="Erase active shape"]').click();
+            this.handleDeleteROI();
+        }
     }
 
     handleMaybeROIModified() {
@@ -853,8 +873,8 @@ class CellLabelingApp {
     }
 
     #updateSideNav() {
-        /* Updates the sidenav because a new point has been clicked */
-        const roi_id = this.selected_roi.id;
+        /* Updates the sidenav */
+        const roi_id = this.selected_roi === null ? null : this.selected_roi.id;
         const roiText = `ROI ${roi_id}`;
         $('#roi-sidenav #this-roi').text(roiText);
         $('#roi-sidenav > *').attr('disabled', false);
@@ -876,7 +896,12 @@ class CellLabelingApp {
             return `rgb(${labelColor.join(', ')})`
         }
 
-        const labelText = this.rois.find(x => x.id === roi_id).label === 'cell' ? 'Cell' : 'Not Cell';
+        let labelText;
+        if (this.selected_roi === null) {
+            labelText = '';
+        } else {
+            labelText = this.rois.find(x => x.id === roi_id).label === 'cell' ? 'Cell' : 'Not Cell';
+        }
         $('#roi-sidenav #roi-label').text(labelText);
         if (labelText === 'Cell') {
             $('#roi-sidenav #roi-label').css('color', 'red');
@@ -884,11 +909,17 @@ class CellLabelingApp {
             $('#roi-sidenav #roi-label').css('color', 'black');
         }
 
-        if (this.selected_roi.isUserAdded) {
+        if (this.selected_roi === null || this.selected_roi.isUserAdded) {
             $('#roi-sidenav #roi-classifier-score').text('');
         } else {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
             $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
+        }
+
+        if (this.selected_roi === null) {
+            // If there is no selected roi, disable buttons, etc
+            $('#roi-sidenav > *').attr('disabled', true);
+            $('#roi-sidenav #notes').attr('disabled', true);
         }
 
     }

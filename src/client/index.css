@@ -65,3 +65,8 @@ span.label_stats {
 #nav-tabs {
     font-size: 22px;
 }
+
+#projection {
+    /* Disable blue outline on focus */
+    outline: none;
+}
