@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from flask import Flask
-from sqlalchemy import desc
+from sqlalchemy import desc, create_engine
 
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import LabelingJob, JobRegion
@@ -68,8 +68,9 @@ class Region:
 class RegionSampler:
     """A class to sample regions from a field of view.
 
-    Can be either sample experiments from LIMS or a file containing a list of
+    Can either sample experiments from LIMS or use a file containing a list of
     pre-selected experiments.
+
     """
     def __init__(
         self,
@@ -91,9 +92,6 @@ class RegionSampler:
         :param db_url:
             Sqlalchemy database URL connection to LIMS. Not used if
             selected_experiments is specified.
-        :param selected_experiments:
-            Path specifying the location of a csv file containing pre-selected
-            experiment ids. Column name for experiment is should be "exp_id".
         :param num_regions_per_exp:
             Number of regions per experiment to sample
         :param fov_divisor:
@@ -132,8 +130,9 @@ class RegionSampler:
     def sample(self,
                exclude_motion_border: bool = True) -> List[Region]:
         """
-        Samples region candidates without replacement equally by experiment
-        depth.
+        Samples region candidates without replacement from a set of
+        imaging planes sampled by depth
+
         :param exclude_motion_border:
             Whether to exclude regions outside of motion border
         :return:
@@ -154,7 +153,9 @@ class RegionSampler:
                 exclude_motion_border=exclude_motion_border
             )
             sub_regions: List[Region] = rng.choice(
-                exp_regions, size=self._num_regions_per_exp)
+                exp_regions,
+                size=self._num_regions_per_exp,
+                replace=False)
             regions.extend(sub_regions)
         return regions
 
@@ -212,14 +213,15 @@ class RegionSampler:
         depths_df : pandas.DataFrame
             Pandas DataFrame containing columns id and imaging_depth.
         """
-        query = "SELECT ophys_e.id as exp_id, ophys_e.imaging_depth_id, "
-        query += "im_depth.id as im_id, im_depth.depth as imaging_depth "
-        query += "FROM ophys_experiments ophys_e "
-        query += "LEFT JOIN imaging_depths im_depth "
-        query += "ON im_depth.id=ophys_e.imaging_depth_id "
-        query += "WHERE ophys_e.id in ("
-        query += ",".join([str(exp_id) for exp_id in experiment_ids])
-        query += ")"
+        query = f"""
+        SELECT ophys_e.id as exp_id, ophys_e.imaging_depth_id,
+            im_depth.id as im_id, im_depth.depth as imaging_depth
+        FROM ophys_experiments ophys_e
+        LEFT JOIN imaging_depths im_depth
+            ON im_depth.id=ophys_e.imaging_depth_id
+        WHERE ophys_e.id in (
+            {",".join([str(exp_id) for exp_id in experiment_ids])}
+        )"""
 
         engine = create_engine(self.db_url)
         with engine.connect() as conn:
