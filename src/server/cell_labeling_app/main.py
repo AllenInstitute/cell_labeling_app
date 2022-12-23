@@ -1,6 +1,4 @@
 import json
-import logging
-import logging.handlers
 import os
 import subprocess
 import sys
@@ -44,7 +42,7 @@ class AppSchema(argschema.ArgSchema):
         description='Port the app should run on'
     )
     server_address = argschema.fields.String(
-        default='localhost',
+        default='localhost:5000',
         description='server address. Should be domain name if running in '
                     'production, i.e. ece-...compute.amazonaws.com'
     )
@@ -87,14 +85,23 @@ class App(argschema.ArgSchemaParser):
     """The main driver for the app."""
     default_schema = AppSchema
 
-    def create_flask_app(self, session_secret_key: str) -> Flask:
+    def create_flask_app(
+            self,
+            session_secret_key: str,
+            is_debug: bool = False) -> Flask:
         """Creates a flask app
         :param session_secret_key: A session secret key for authentication
+        :param is_debug
         :return: instantiated flask app
 
         """
-        template_dir = (
-                    Path(__file__).parent / 'client').resolve()
+        if is_debug:
+            template_dir = (
+                        Path(__file__).parent.parent.parent / 'client')\
+                .resolve()
+        else:
+            template_dir = (
+                        Path(__file__).parent / 'client').resolve()
         static_dir = template_dir
         app = Flask(__name__, static_folder=static_dir,
                     template_folder=str(template_dir))
@@ -169,7 +176,8 @@ if __name__ == '__main__':
     app.create_backup_manager()
 
     if app.args['debug']:
-        flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()))
+        flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()),
+                                         is_debug=True)
         flask_app.run(debug=True, port=app.args['PORT'])
     else:
         app.run_production_server()

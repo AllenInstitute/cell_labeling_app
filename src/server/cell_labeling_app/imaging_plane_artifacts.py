@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Dict
 
 import h5py
 import numpy as np
@@ -91,29 +91,37 @@ class ArtifactFile:
 
         return projection
 
-    def get_trace(self, roi_id: Optional[str] = None,
-                  point: Optional[List] = None) -> np.ndarray:
+    def get_trace(
+            self,
+            is_user_added: bool,
+            roi: Dict,
+            roi_id: int) -> np.ndarray:
         """
         Gets trace. If roi_id not provided, gets trace at point from video
         :param roi_id:
             ROI id to retrieve trace for
-        :param point:
-            point to retrieve trace for
-        :return:
-        """
-        if roi_id is not None and point is not None:
-            raise ValueError('Must provide roi_id or point, not both')
+        :param is_user_added:
+            Whether the user added this roi or it was precomputed
+        :param roi:
+            Must include x, y, width, height
 
-        if roi_id is not None:
+        :return: trace
+        """
+        if is_user_added:
+            trace = self._get_trace_for_user_added_roi(roi=roi)
+        else:
             with h5py.File(self._path, 'r') as f:
                 trace = (f['traces'][roi_id][()])
-        elif point is not None:
-            trace = self._get_trace_for_point(point=point)
-        else:
-            raise ValueError('Must provide roi_id or point')
+
         return trace
 
-    def _get_trace_for_point(self, point: List) -> np.ndarray:
-        x, y = point
+    def _get_trace_for_user_added_roi(self, roi: Dict) -> np.ndarray:
+        """Calculates a trace for roi by finding the mean pixel value in ROI
+        across time"""
+        x = roi['x']
+        y = roi['y']
+        width = roi['width']
+        height = roi['height']
         with h5py.File(self._path, 'r') as f:
-            return f['video_data'][:, y, x]
+            sub_mov = f['video_data'][:, y:y+height, x:x+width]
+            return sub_mov.reshape(sub_mov.shape[0], -1).mean(axis=-1)

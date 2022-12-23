@@ -90,8 +90,6 @@ def get_soft_filter_roi_color(classifier_score: float,
 def get_rois_in_region(region: JobRegion,
                        include_overlapping_rois=True):
     """Gets all ROIs within a given region of the field of view.
-    :param experiment_id:
-        experiment id
     :param region:
         region to get contours for
     :param include_overlapping_rois:
@@ -211,16 +209,31 @@ def get_roi_contours_in_region(experiment_id: str, region: JobRegion,
     return all_contours
 
 
-def get_trace(experiment_id: str, roi_id: str, point: Optional[List] = None):
+def get_trace(
+        experiment_id: str,
+        roi_id: int,
+        is_user_added: bool,
+        contours: List[List[int]]
+):
+    """
+    Gets a trace. If it is an already segmented object, pulls the precomputed
+    trace. Otherwise, computes a trace.
+
+    @param experiment_id: experiment id
+    @param roi_id: roi id
+    @param is_user_added: Whether the user added this ROI or it was precomputed
+    @param contours: ROI contours, needed if is_user_added
+    @return: trace
+    """
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
     af = ArtifactFile(path=artifact_path)
 
-    if point is None:
-        # retrieve precomputed trace
-        trace = af.get_trace(roi_id=roi_id)
-    else:
-        # Pull the trace from the video for the point
-        trace = af.get_trace(point=point)
+    roi = create_roi_from_contours(contours=contours)
+    trace = af.get_trace(
+        roi_id=roi_id,
+        roi=roi,
+        is_user_added=is_user_added)
+
     return trace
 
 
@@ -529,3 +542,43 @@ def update_roi_extra_for_region(region_id: int, roi_extra: List[dict]):
         db.session.add(roi_extra)
 
     db.session.commit()
+
+
+def create_roi_from_contours(contours: List, image_dims=(512, 512)) -> Dict:
+    """Given a list of points representing roi contours, create an ROI
+    :param contours: list of roi contours
+    :param image_dims: dimensions of FOV
+    :return Dict
+        x: upper left x coord of roi bounding box
+        y: upper left y coord of roi bounding box
+        width: width of roi bounding box
+        height: height of roi bounding box
+        mask: roi boolean mask within bounding box of size height x width
+    """
+    contours = np.array(contours, dtype=int)
+
+    # 1. Get bounding box of contours
+
+    contours_poly = cv2.approxPolyDP(
+        # Only supporting single set of contours (i.e. not disconnected)
+        contours[0],
+        3,
+        True
+    )
+    x1, y1, width, height = cv2.boundingRect(contours_poly)
+
+    # 2. Get boolean mask within bounding box
+    x = np.zeros(image_dims, dtype='uint8')
+
+    # Create a mask for the set of contours
+    cv2.drawContours(x, contours, -1, 1, -1)
+
+    mask = x[y1:y1+height, x1:x1+width].astype(bool)
+
+    return {
+        'x': x1,
+        'y': y1,
+        'width': width,
+        'height': height,
+        'mask': mask
+    }

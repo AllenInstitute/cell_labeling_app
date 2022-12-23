@@ -83,7 +83,7 @@ class CellLabelingApp {
 
         $('#in-progress-no, #in-progress-modal-close').on('click', () => {
             $('#in-progress-warning-modal').modal('hide');
-        })
+        });
     }
 
     addProjectionListeners() {
@@ -95,12 +95,38 @@ class CellLabelingApp {
             this.handleProjectionClick(x, y);
         });
 
+        projection.on('plotly_selected', () => {
+           this.handleDrawSegmentationOutline();
+        });
+
+        projection.on('plotly_relayout', () => {
+            this.handleProjectionRelayout();
+        });
+
+        // Enable event listeners that require focus on canvas
+        projection.tabIndex = 1000;
+
+        projection.addEventListener('keyup', event => {
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                this.handleDeleteKeyPressOnProjection();
+            }
+        });
+
     }
 
     displayTrace() {
-        const url = `http://${SERVER_ADDRESS}/get_trace?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`;
-
-        return $.get(url, data => {
+        return fetch(`http://${SERVER_ADDRESS}/get_trace`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                experiment_id: this.experiment_id,
+                roi: this.selected_roi
+            })
+        }).then(async response => await response.json())
+        .then(data => {
             const trace = {
                 x: _.range(data['trace'].length),
                 y: data['trace']
@@ -139,6 +165,9 @@ class CellLabelingApp {
             // If we are in the state of reviewing ROIs with labels
             // that disagree with the classifier
             rois = this.discrepancy_rois;
+            // Add all user-added rois
+            this.rois.filter(x => x.isUserAdded)
+                .forEach(roi => rois.push(roi));
         }
 
         if (rois === null) {
@@ -173,6 +202,7 @@ class CellLabelingApp {
                 return contours.map((coordinate, index) => {
                     let instruction;
                     const [x, y] = coordinate;
+
                     if (index === 0) {
                         instruction = `M ${x},${y}`;
                     } else {
@@ -207,7 +237,9 @@ class CellLabelingApp {
                 line: {
                     width: line_width,
                     color: `rgb(${color[0]}, ${color[1]}, ${color[2]})`
-                }
+                },
+                editable: rois[i].isUserAdded,
+                roiId: rois[i].id
             }
         });
     }
@@ -269,11 +301,18 @@ class CellLabelingApp {
                     },
                     yaxis: {
                         range: this.fovBounds['y']
+                    },
+                    // Segmentation outlines manually drawn on projection
+                    newshape: {
+                        line: {
+                            color: 'rgb(255, 0, 0)'
+                        }
                     }
                 };
 
                 const config = {
-                    doubleClick: false
+                    doubleClick: false,
+                    modeBarButtonsToAdd: ['drawclosedpath', 'eraseshape']
                 };
 
                 Plotly.newPlot('projection', [trace1], layout, config).then(() => {
@@ -319,8 +358,17 @@ class CellLabelingApp {
         this.is_video_shown = false;
 
         if (videoTimeframe === null) {
-            videoTimeframe = await fetch(`http://${SERVER_ADDRESS}/get_default_video_timeframe?experiment_id=${this.experiment_id}&roi_id=${this.selected_roi.id}&is_segmented=${this.selected_roi.contours !== null}`)
-                .then(async data => await data.json())
+            videoTimeframe = await fetch(`http://${SERVER_ADDRESS}/get_default_video_timeframe`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        experiment_id: this.experiment_id,
+                        roi: this.selected_roi
+                    })
+                }).then(async response => await response.json())
                 .then(data => data['timeframe']);
         }
 
@@ -330,14 +378,14 @@ class CellLabelingApp {
         const postData = {
             experiment_id: this.experiment_id,
             roi_id: this.selected_roi.id,
-            point: this.selected_roi.point,
             color: this.selected_roi.color,
             region_id: this.region['id'],
             fovBounds: this.fovBounds,
             include_current_roi_mask: this.show_current_roi_outline_on_movie,
             include_all_roi_masks: this.show_all_roi_outlines_on_movie,
             timeframe: videoTimeframe,
-            is_segmented: this.selected_roi.contours !== null,
+            is_user_added: this.selected_roi.isUserAdded,
+            contours: this.selected_roi.contours
         };
         return $.ajax({
             xhrFields: {
@@ -399,32 +447,6 @@ class CellLabelingApp {
         }
 
         return Promise.all(artifactLoaders);
-    }
-
-    getRoiPointShapes(radius = 2) {
-        let rois;
-        if (!this.show_current_region_roi_contours_on_projection) {
-            rois = [];
-        } else {
-            rois = this.rois;
-        }
-        const points = rois
-            // Filter out all segmented ROIs to leave just the points
-            .filter(x => x.contours === null)
-            .map(roi => {
-                const [x, y] = roi.point;
-                return {
-                    type: 'circle',
-                    opacity: 1.0,
-                    fillcolor: `rgb(${roi.color.join(',')})`,
-                    x0: x - radius,
-                    x1: x + radius,
-                    y0: y - radius,
-                    y1: y + radius
-                }
-
-            });
-        return points;
     }
 
     initialize() {
@@ -551,14 +573,11 @@ class CellLabelingApp {
             region_id: this.region['id'],
             labels:
                 this.rois
-                    // Filtering out any currently selected non-cell points
-                    .filter(x => x.contours !== null ||
-                        (x.point !== null && x.label === 'cell'))
                     .map(x => {
                         return {
                             roi_id: x.id,
-                            is_segmented: x.contours !== null,
-                            point: x.point,
+                            is_user_added: x.isUserAdded,
+                            contours: x.isUserAdded ? x.contours : null,
                             label: x.label
                         }
                     }),
@@ -684,6 +703,105 @@ class CellLabelingApp {
         this.updateProjectionContrast(0.0, 1.0);
     }
 
+    handleDrawSegmentationOutline() {
+        const shapes = document.getElementById('projection').layout.shapes;
+
+        // Get user-added shape
+        const userAddedshapeIndex = shapes.findLastIndex(x => x.editable);
+
+        const userAddedShape = shapes[userAddedshapeIndex];
+
+        const contours = this.#getContoursFromSVGPath(userAddedShape.path);
+
+        if (this.isUserDrawnROIOutsideRegion(contours)) {
+            this.updateShapesOnProjection();
+            return;
+        }
+
+        // Assigning a new roi id that is greater than max
+        const roiId = Math.max(...this.rois.map(x => x.id)) + 100;
+
+        this.rois.push(new ROI({
+            id: roiId,
+            experiment_id: this.experiment_id,
+            color: [255, 0, 0],
+            classifier_score: null,
+            label: 'cell',
+            contours,
+            isUserAdded: true
+        }));
+
+        // Setting dragmode to false so that the drawing tool is deselected
+        // After drawing
+        Plotly.relayout(
+            'projection',
+            {'dragmode': false}
+        );
+
+        this.#handleSegmentedPointClick({roi_id: roiId});
+    }
+
+    handleProjectionRelayout(projectionShapes) {
+        const shapes = document.getElementById('projection').layout.shapes;
+        const userAddedROIs = this.rois.filter(roi => roi.isUserAdded);
+        const userAddedShapes = shapes.filter(x => x.editable);
+
+        if(userAddedROIs.length > userAddedShapes.length) {
+            // The user deleted an ROI
+            this.handleDeleteROI();
+        } else {
+            // The user might have modified an ROI
+            this.handleMaybeROIModified();
+        }
+    }
+
+    handleDeleteROI() {
+        /*
+        Checks which ROI shape was deleted and deletes it from the set of rois
+         */
+        const shapes = document.getElementById('projection').layout.shapes;
+        const userAddedShapes = shapes.filter(x => x.editable);
+        const userAddedROIs = this.rois.filter(roi => roi.isUserAdded);
+
+        const userAddedShapeRoiIds = new Set(userAddedShapes.map(x => x.roiId));
+
+        const deletedRoiId = userAddedROIs.find(
+            x => !userAddedShapeRoiIds.has(x.id));
+        this.rois = this.rois.filter(x => x.id !== deletedRoiId.id);
+        this.selected_roi = null;
+        this.#updateSideNav();
+
+    }
+
+    async handleDeleteKeyPressOnProjection() {
+        if (this.selected_roi !== null && this.selected_roi.isUserAdded) {
+            // ROI selected and it is editable
+            document.querySelector(
+                    'a[data-title="Erase active shape"]').click();
+            this.handleDeleteROI();
+        }
+    }
+
+    handleMaybeROIModified() {
+        /*
+        Updates contours of roi in case the currently selected roi
+        had its vertices updated
+         */
+        if (this.selected_roi !== null) {
+            const maybeModifiedShape =
+                document.getElementById('projection').layout.shapes
+                .find(x => x.hasOwnProperty('roiId') &&
+                    x.roiId === this.selected_roi.id);
+            if (maybeModifiedShape !== undefined) {
+                const roiIdx = this.rois.findIndex(
+                    x => x.id === this.selected_roi.id);
+                this.rois[roiIdx].contours = this.#getContoursFromSVGPath(
+                    maybeModifiedShape.path)
+            }
+        }
+
+    }
+
     async handleProjectionClick(x, y) {
         /* 
         Args
@@ -694,6 +812,7 @@ class CellLabelingApp {
         let postData = {
             current_region_id: this.region['id'],
             roi_ids: this.rois.map(roi => roi.id),
+            user_added_rois: this.rois.filter(x => x.isUserAdded),
             coordinates: [x, y]
         }
         postData = JSON.stringify(postData);
@@ -711,7 +830,7 @@ class CellLabelingApp {
         });
 
         if (res['roi_id'] === null) {
-            await this.#handleNonSegmentedPointClick({x, y});
+            // Do nothing. Clicking outside an ROI.
         } else {
             await this.#handleSegmentedPointClick({roi_id: res['roi_id']});
         }
@@ -726,9 +845,11 @@ class CellLabelingApp {
                 .map(x => x.id)
         );
 
-        this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
-
-        if (this.selected_roi !== null && this.selected_roi.id === selectedRoi.id) {
+        if (this.selected_roi !== null &&
+            this.selected_roi.id === selectedRoi.id &&
+            // don't toggle label on user added ROI
+            !this.selected_roi.isUserAdded
+        ) {
             const idx = this.rois.findIndex(x => x.id === selectedRoi.id);
             // Clicking the currently selected ROI again
             if (cell_roi_ids.has(selectedRoi.id)) {
@@ -751,76 +872,10 @@ class CellLabelingApp {
         await this.updateShapesOnProjection();
     }
 
-    async #handleNonSegmentedPointClick({x, y} = {}) {
-        /* Handles when the user clicks on a point that has no computed boundary 
-        Args
-        ------
-        - x: x coordinate in fov of click
-        - y: y coordinate in fov of click
-        */
-
-        // Checking if clicked point is outside requested region
-        // Note x and y swapped due to image coordinates
-        if (x < this.region.y || x > this.region.y + this.region.height ||
-            y < this.region.x || y > this.region.x + this.region.width) {
-            const msg = 'The clicked point is outside of the requested region';
-            displayTemporaryAlert({msg, type: 'danger'});
-            return;
-        }
-        const isClose = (point1, point2) => {
-            /* Returns true if the newly selected point is 
-            close to the currently selected point 
-        
-            Args
-            -----
-            */
-            const [x1, y1] = point1;
-            const [x2, y2] = point2;
-            const distance = Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-            return distance <= 4;
-        }
-        const closePointIdx = this.rois
-            .findIndex(roi => roi.point !== null &&
-                isClose(roi.point, [x, y]));
-        let selectedRoi;
-        if (closePointIdx >= 0) {
-            // Clicking on a point that already exists
-            selectedRoi = this.rois[closePointIdx];
-            if (this.rois[closePointIdx].label === 'cell') {
-                this.rois[closePointIdx].label = 'not cell';
-                this.rois[closePointIdx].color = [255, 255, 255]
-            } else {
-                this.rois[closePointIdx].label = 'cell';
-                this.rois[closePointIdx].color = [255, 0, 0]
-            }
-
-        } else {
-            // Clicking on a new point
-            selectedRoi = new ROI({
-                id: `${x},${y}`,
-                experiment_id: this.experiment_id,
-                color: [255, 255, 255],
-                label: 'not cell',
-                point: [x, y]
-            });
-            this.rois.push(selectedRoi);
-        }
-
-        this.removeCurrentlySelectedNonSegmentedPoint(selectedRoi);
-
-        this.selected_roi = selectedRoi;
-
-        this.resetSideNav();
-        this.#updateSideNav();
-        await this.updateShapesOnProjection();
-    }
-
     #updateSideNav() {
-        /* Updates the sidenav because a new point has been clicked */
-        const point = this.selected_roi.point;
-        const roi_id = this.selected_roi.id;
-        const isSegmented = this.selected_roi.contours !== null;
-        const roiText = isSegmented ? `ROI ${roi_id}` : `ROI at point ${point}`;
+        /* Updates the sidenav */
+        const roi_id = this.selected_roi === null ? null : this.selected_roi.id;
+        const roiText = `ROI ${roi_id}`;
         $('#roi-sidenav #this-roi').text(roiText);
         $('#roi-sidenav > *').attr('disabled', false);
         $('#roi-sidenav #notes').attr('disabled', false);
@@ -841,7 +896,12 @@ class CellLabelingApp {
             return `rgb(${labelColor.join(', ')})`
         }
 
-        const labelText = this.rois.find(x => x.id === roi_id).label === 'cell' ? 'Cell' : 'Not Cell';
+        let labelText;
+        if (this.selected_roi === null) {
+            labelText = '';
+        } else {
+            labelText = this.rois.find(x => x.id === roi_id).label === 'cell' ? 'Cell' : 'Not Cell';
+        }
         $('#roi-sidenav #roi-label').text(labelText);
         if (labelText === 'Cell') {
             $('#roi-sidenav #roi-label').css('color', 'red');
@@ -849,9 +909,17 @@ class CellLabelingApp {
             $('#roi-sidenav #roi-label').css('color', 'black');
         }
 
-        if (this.selected_roi.contours !== null) {
+        if (this.selected_roi === null || this.selected_roi.isUserAdded) {
+            $('#roi-sidenav #roi-classifier-score').text('');
+        } else {
             $('#roi-sidenav #roi-classifier-score').text(`${getClassifierScore()}`)
             $('#roi-sidenav #roi-classifier-score').css('color', getClassifierProbabilityTextColor(labelText));
+        }
+
+        if (this.selected_roi === null) {
+            // If there is no selected roi, disable buttons, etc
+            $('#roi-sidenav > *').attr('disabled', true);
+            $('#roi-sidenav #notes').attr('disabled', true);
         }
 
     }
@@ -1042,27 +1110,26 @@ class CellLabelingApp {
         });
     }
 
-    removeCurrentlySelectedNonSegmentedPoint(selectedRoi) {
-        if (this.selected_roi !== null &&
-            this.selected_roi.contours === null &&
-            this.selected_roi.label === 'not cell' &&
-            this.selected_roi.id !== selectedRoi.id) {
-            // If we had an ROI selected and it is not a cell,
-            // and it is a nonsegmented point,
-            // and it is not the current roi,
-            // remove it
-            this.rois = this.rois.filter(x => x.id !== this.selected_roi.id);
-        }
-    }
-
     async updateShapesOnProjection() {
         const contours = await this.getRoiContourShapes();
-        const points = this.getRoiPointShapes();
         const regionBoundary = this.getRegionBoundariesShape();
         const motionBorder = await this.getMotionBorderShape();
-        const shapes = [...contours, ...points, regionBoundary,
+        const shapes = [...contours, regionBoundary,
             ...motionBorder];
         Plotly.relayout('projection', {'shapes': shapes});
+
+        // Add listener for clicking the stroke (exterior) of editable shapes,
+        // Since plotly_click event is not triggered in that case
+        shapes
+            .map((x, idx) => x.editable ? idx : -1)
+            .filter(idx => idx > 0)
+            .forEach(idx => {
+                d3.select(`.shapelayer path:nth-child(${idx+1})`)
+                .attr('pointer-events', 'stroke')
+                .on('click', () => {
+                    this.handleUserDrawnSegmentationOutlineClick(idx);
+                });
+            });
     }
 
     async #populateSubmittedRegionsTable() {
@@ -1120,6 +1187,14 @@ class CellLabelingApp {
     }
 
     async #handleSubmittedRegionsTableCLick(row, tr) {
+        /*
+        At this point, shapes are already drawn onto projection
+        and all ROIs already loaded into memory.
+        This updates labels and adds any user added ROIs
+
+        - row: row metadata
+        - tr: row dom node
+         */
         const handleReviewTableClickOk = async () => {
             // hide submit labels button and show update button
             $('#submit_labels').hide();
@@ -1159,15 +1234,16 @@ class CellLabelingApp {
                 roi.label = roiId_label_map.get(roi.id)
             });
 
-            // add any non-segmented points
+            // add any user-added ROIs
             labels.forEach(label => {
-                if (label.point) {
+                if (label.is_user_added) {
                     this.rois.push(new ROI({
                         id: label.roi_id,
                         experiment_id: this.experiment_id,
                         color: [255, 0, 0],
                         label: 'cell',
-                        point: label.point
+                        isUserAdded: label.is_user_added,
+                        contours: label.contours
                     }));
                 }
             });
@@ -1277,6 +1353,49 @@ class CellLabelingApp {
                 return true;
             }
             return false;
+        });
+    }
+
+    #getContoursFromSVGPath(path) {
+        /*
+            path: svg path string
+         */
+        // Remove the first character "M" and the last character "Z"
+        path = path.substring(1, path.length - 1);
+
+        path = path.split('L');
+        path = path.map(coords => coords.split(','));
+        const contours = path.map(coords => {
+            let [x, y] = coords;
+            x = parseInt(x);
+            y = parseInt(y);
+            return [x, y];
+        });
+        return [contours];
+    }
+
+    handleUserDrawnSegmentationOutlineClick(idx) {
+        /*
+        Finds the ROI belonging to the clicked shape at `idx`
+         */
+        const domShapes = document.getElementById('projection').layout.shapes;
+        const clickedRoi = this.rois.find(x => x.id === domShapes[idx].roiId);
+        this.#handleSegmentedPointClick({roi_id: clickedRoi.id});
+    }
+
+    isUserDrawnROIOutsideRegion(contours) {
+        /*
+        Returns whether contours lie outside region
+         */
+        contours = contours[0];
+
+        return contours.every(coord => {
+            const [x, y] = coord;
+            // Note region x and y swapped because of array coordinates
+            // (not image coordinates)
+            return (
+                (x < this.region.y || x > this.region.y + this.region.width) ||
+                (y < this.region.x || y > this.region.x + this.region.height));
         });
     }
 }
