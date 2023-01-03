@@ -100,8 +100,10 @@ class App(argschema.ArgSchemaParser):
                         Path(__file__).parent.parent.parent / 'client')\
                 .resolve()
         else:
+            # sys.prefix points to virtual environment root,
+            # where "client" dir has been installed
             template_dir = (
-                        Path(__file__).parent / 'client').resolve()
+                        Path(sys.prefix) / 'client').resolve()
         static_dir = template_dir
         app = Flask(__name__, static_folder=static_dir,
                     template_folder=str(template_dir))
