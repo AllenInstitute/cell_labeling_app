@@ -11,7 +11,7 @@ from cell_labeling_app.database.schemas import User, LabelingJob, JobRegion
 from flask import Flask
 from sqlalchemy import desc
 
-from cell_labeling_app.util.util import get_next_region
+from cell_labeling_app.util.util import get_next_region, get_all_labels
 
 
 class TestGetNextRegion:
@@ -154,6 +154,15 @@ class TestGetNextRegion:
         # There's only 1 region left
         assert next_region.id == 3
 
+    def test_get_all_labels(self):
+        self._init_db(labels_per_region_limit=3, num_regions=3)
+        self._add_labels(user_ids=self.user_ids[:2], region_ids=[1])
+        self._add_labels(user_ids=self.user_ids[:1], region_ids=[2])
+
+        labels = get_all_labels()
+        assert labels.shape[0] > 0 and \
+               set(labels.columns) == {'experiment_id', 'labels', 'user_id'}
+
     @staticmethod
     def _get_next_region(user_id: str,
                          prioritize_regions_by_label_count: bool) -> JobRegion:
@@ -168,8 +177,16 @@ class TestGetNextRegion:
     def _add_labels(user_ids: List[str], region_ids: List[int]):
         for user_id in user_ids:
             for region_id in region_ids:
+                labels = [
+                    {
+                        'roi_id': 0,
+                        'is_user_added': False,
+                        'contours': None,
+                        'label': 'cell'
+                    }
+                ]
                 user_labels = UserLabels(user_id=str(user_id),
                                          region_id=region_id,
-                                         labels=json.dumps({}))
+                                         labels=json.dumps(labels))
                 db.session.add(user_labels)
         db.session.commit()

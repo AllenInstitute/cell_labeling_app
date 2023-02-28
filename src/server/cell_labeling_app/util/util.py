@@ -478,6 +478,22 @@ def get_labels_for_region(region_id: int) -> Tuple[List[dict], List[dict]]:
     return labels, roi_extra
 
 
+def get_all_labels() -> pd.DataFrame:
+    """Gets all labels"""
+    labels = (
+        db.session.query(
+            JobRegion.experiment_id,
+            UserLabels.labels,
+            UserLabels.user_id)
+        .join(JobRegion,
+              JobRegion.id == UserLabels.region_id)
+        .all()
+    )
+    labels = pd.DataFrame(labels,
+                          columns=['experiment_id', 'labels', 'user_id'])
+    return labels
+
+
 def update_labels_for_region(region_id: int, labels: List[dict]):
     """
     Updates labels for region given by `region_id`

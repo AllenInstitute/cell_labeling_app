@@ -425,6 +425,12 @@ def get_labels_for_region():
     }
 
 
+@api.route('/get_all_labels', methods=['GET'])
+def get_all_labels():
+    labels = util.get_all_labels()
+    return labels.to_dict(orient='records')
+
+
 @api.route('/update_labels_for_region', methods=['POST'])
 def update_labels_for_region():
     data = request.get_json(force=True)
