@@ -223,7 +223,7 @@ class TestPopulateLabelingJob:
             regions = sampler.sample(
                 exclude_motion_border=exclude_motion_border
             )
-        populate_labeling_job(regions=regions)
+        populate_labeling_job(name='test', regions=regions)
 
         num_added = db.session.query(JobRegion).filter_by(
             job_id=1).count()

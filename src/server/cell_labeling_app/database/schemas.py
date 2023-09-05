@@ -9,6 +9,7 @@ class LabelingJob(db.Model):
     """A labeling job"""
     job_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    name = db.Column(db.String, doc='Labeling job name', unique=True)
 
 
 class JobRegion(db.Model):

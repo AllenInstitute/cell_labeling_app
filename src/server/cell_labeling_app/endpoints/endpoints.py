@@ -1,19 +1,17 @@
 import json
 from io import BytesIO
-from typing import List, Dict
 
-import cv2
 import numpy as np
 from PIL import Image
 from flask import render_template, request, send_file, Blueprint, \
-    current_app, Request
+    current_app
 from flask_login import current_user
 from ophys_etl.modules.roi_cell_classifier.video_utils import (
     get_thumbnail_video_from_artifact_file)
 
 from cell_labeling_app.database.database import db
 from cell_labeling_app.database.schemas import JobRegion, \
-    UserLabels, UserRoiExtra
+    UserLabels, UserRoiExtra, LabelingJob
 from cell_labeling_app.util import util
 from cell_labeling_app.util.util import get_artifacts_path, \
     get_user_has_labeled, get_completed_regions, \
@@ -63,7 +61,8 @@ def get_roi_contours():
 
 @api.route("/get_random_region")
 def get_random_region():
-    next_region = get_next_region()
+    job_id = int(request.args['job_id'])
+    next_region = get_next_region(job_id=job_id)
     if not next_region:
         # No more to label
         return {
@@ -363,10 +362,12 @@ def get_label_stats():
     :return:
         Dict of stats
     """
-    user_has_labeled = get_user_has_labeled()
-    completed = get_completed_regions()
-    completed_by_others = get_completed_regions(exclude_current_user=True)
-    total = get_total_regions_in_labeling_job()
+    job_id = int(request.args['job_id'])
+    user_has_labeled = get_user_has_labeled(job_id=job_id)
+    completed = get_completed_regions(job_id=job_id)
+    completed_by_others = get_completed_regions(job_id=job_id,
+                                                exclude_current_user=True)
+    total = get_total_regions_in_labeling_job(job_id=job_id)
 
     return {
         'n_user_has_labeled': len(user_has_labeled),
@@ -387,7 +388,8 @@ def after_request(response):
 
 @api.route('/get_user_submitted_labels')
 def get_user_submitted_labels():
-    labels = get_user_has_labeled()
+    job_id = int(request.args['job_id'])
+    labels = get_user_has_labeled(job_id=job_id)
     labels = [
         {
             'submitted': r['submitted'],
@@ -439,3 +441,18 @@ def update_labels_for_region():
     util.update_roi_extra_for_region(region_id=data['region_id'],
                                      roi_extra=data['roi_extra'])
     return 'success'
+
+
+@api.route('/get_all_labeling_jobs', methods=['GET'])
+def get_all_labeling_jobs():
+    jobs = (db.session.query(LabelingJob).all())
+    jobs = [
+        {
+            'name': j.name,
+            'id': j.job_id
+        } for j in jobs
+    ]
+
+    return {
+        'jobs': jobs
+    }

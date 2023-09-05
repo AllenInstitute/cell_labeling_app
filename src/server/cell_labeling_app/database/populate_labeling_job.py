@@ -304,15 +304,20 @@ class RegionSampler:
         return experiment_ids
 
 
-def populate_labeling_job(regions: List[Region]):
+def populate_labeling_job(
+    name: str,
+    regions: List[Region]
+):
     """
     Creates a new labeling job
+    :param name
+        Labeling job name
     :param regions
         List of regions to add to the labeling job
     :return:
         None. Inserts records into the DB
     """
-    job = LabelingJob()
+    job = LabelingJob(name=name)
     db.session.add(job)
 
     job_id = db.session.query(LabelingJob.job_id).order_by(desc(
@@ -334,6 +339,8 @@ def populate_labeling_job(regions: List[Region]):
 if __name__ == '__main__':
     def main():
         parser = argparse.ArgumentParser()
+        parser.add_argument('--labeling_job_name', required=True,
+                            help='Name to assign to this labeling job')
         parser.add_argument('--database_path', required=True,
                             help='Path to where the database should get '
                                  'created')
@@ -425,6 +432,8 @@ if __name__ == '__main__':
         regions = sampler.sample(
             exclude_motion_border=args.exclude_motion_border,
         )
-        populate_labeling_job(regions=regions)
+        populate_labeling_job(
+            name=args.labeling_job_name,
+            regions=regions)
 
     main()
