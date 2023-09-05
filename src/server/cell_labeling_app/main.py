@@ -124,7 +124,7 @@ class App(argschema.ArgSchemaParser):
     def run_production_server(self):
         """Launches webserver running app"""
         gunicorn_cmd_args = [
-            f'--bind=localhost:{self.args["PORT"]}',
+            f'--bind=0.0.0.0:{self.args["PORT"]}',
             f'--workers={self.args["num_workers"]}',
             '--capture-output',
             '--name=cell_labeling_app',
