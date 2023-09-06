@@ -105,14 +105,19 @@ class CellLabelingApp {
         jobs.forEach(project => {
             $('select#labeling_job_select').append(`<option value="${project['id']}">${project['name']}</option>`);
         });
-        const job = $('select#labeling_job_select').children("option:selected").text();
-        $('a#labeling_job_name').text(job);
+        if (Cookies.get('labeling_job') !== null) {
+            const jobId = Cookies.get('labeling_job');
+            $(`select#labeling_job_select option[value=${jobId}]`).attr('selected', 'selected');
+        }
+        const jobName = $('select#labeling_job_select').children("option:selected").text();
+        $('a#labeling_job_name').text(jobName);
     }
 
     handleLabelingJobChange() {
-        const job = $('select#labeling_job_select').children("option:selected").text();
-        $('a#labeling_job_name').text(job);
-        this.loadNewRegion();
+        const selected_job = $('select#labeling_job_select').children("option:selected");
+        $('a#labeling_job_name').text(selected_job.text());
+        Cookies.set('labeling_job', selected_job.val());
+        this.#handleLabelNewRegionClick();
     }
 
     addProjectionListeners() {
