@@ -2,12 +2,10 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import uuid
 from pathlib import Path
 
 import argschema
-from cell_labeling_app.backup_manager import BackupManager
 from flask import Flask
 
 from cell_labeling_app.database.database import db
@@ -152,18 +150,6 @@ class App(argschema.ArgSchemaParser):
                        stderr=sys.stderr,
                        env=os.environ)
 
-    def create_backup_manager(self):
-        """Starts a backup manager running in the background in a new thread"""
-        database_path = Path(self.args['database_path'])
-        backup_manager = BackupManager(
-            log_file=self.args['LOG_FILE'],
-            database_path=database_path,
-            backup_dir=database_path.parent / 'backups',
-            frequency=self.args['backup_params']['frequency']
-        )
-        t = threading.Thread(target=backup_manager.run)
-        t.start()
-
 
 def main(input_json_path: str, session_secret_key: str) -> Flask:
     with open(input_json_path) as f:
@@ -175,7 +161,6 @@ def main(input_json_path: str, session_secret_key: str) -> Flask:
 
 if __name__ == '__main__':
     app = App()
-    app.create_backup_manager()
 
     if app.args['debug']:
         flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()),
