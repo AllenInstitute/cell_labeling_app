@@ -91,7 +91,7 @@ class TestGetNextRegion:
         # then this user should not be able to sample the region
         with patch('cell_labeling_app.util.util.current_user') as mock_user:
             mock_user.get_id = MagicMock(return_value='3')
-            next_region = get_next_region()
+            next_region = get_next_region(job_id=1)
 
         if labels_per_region_limit is not None:
             assert next_region is None
@@ -170,7 +170,9 @@ class TestGetNextRegion:
             mock_user.get_id = MagicMock(return_value=user_id)
             next_region = get_next_region(
                 prioritize_regions_by_label_count=
-                prioritize_regions_by_label_count)
+                prioritize_regions_by_label_count,
+                job_id=1
+            )
             return next_region
 
     @staticmethod

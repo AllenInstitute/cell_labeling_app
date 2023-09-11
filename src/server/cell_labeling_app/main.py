@@ -2,12 +2,10 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import uuid
 from pathlib import Path
 
 import argschema
-from cell_labeling_app.backup_manager import BackupManager
 from flask import Flask
 
 from cell_labeling_app.database.database import db
@@ -16,17 +14,11 @@ from cell_labeling_app.endpoints.user_authentication import users
 from cell_labeling_app.user_authentication.user_authentication import login
 
 
-class _BackupSchema(argschema.ArgSchema):
-    frequency = argschema.fields.Integer(
-        default=60 * 0.5,
-        description='Number of seconds to wait before creating a new backup'
-    )
-
-
 class AppSchema(argschema.ArgSchema):
-    database_path = argschema.fields.InputFile(
+    sqlalchemy_database_uri = argschema.fields.String(
         required=True,
-        description='Database path',
+        description='sqlalchemy database uri. '
+                    'See https://docs.sqlalchemy.org/en/20/core/engines.html',
     )
     ARTIFACT_DIR = argschema.fields.InputDir(
         required=True,
@@ -75,10 +67,6 @@ class AppSchema(argschema.ArgSchema):
         default=32,
         description='Number of workers to use for the webserver'
     )
-    backup_params = argschema.fields.Nested(
-        _BackupSchema,
-        default={}
-    )
 
 
 class App(argschema.ArgSchemaParser):
@@ -108,7 +96,7 @@ class App(argschema.ArgSchemaParser):
         app = Flask(__name__, static_folder=static_dir,
                     template_folder=str(template_dir))
         app.config['SQLALCHEMY_DATABASE_URI'] = \
-            f'sqlite:///{self.args["database_path"]}'
+            self.args['sqlalchemy_database_uri']
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         app.config['SESSION_SECRET_KEY'] = session_secret_key
         app.register_blueprint(api)
@@ -124,7 +112,7 @@ class App(argschema.ArgSchemaParser):
     def run_production_server(self):
         """Launches webserver running app"""
         gunicorn_cmd_args = [
-            f'--bind=localhost:{self.args["PORT"]}',
+            f'--bind=0.0.0.0:{self.args["PORT"]}',
             f'--workers={self.args["num_workers"]}',
             '--capture-output',
             '--name=cell_labeling_app',
@@ -152,18 +140,6 @@ class App(argschema.ArgSchemaParser):
                        stderr=sys.stderr,
                        env=os.environ)
 
-    def create_backup_manager(self):
-        """Starts a backup manager running in the background in a new thread"""
-        database_path = Path(self.args['database_path'])
-        backup_manager = BackupManager(
-            log_file=self.args['LOG_FILE'],
-            database_path=database_path,
-            backup_dir=database_path.parent / 'backups',
-            frequency=self.args['backup_params']['frequency']
-        )
-        t = threading.Thread(target=backup_manager.run)
-        t.start()
-
 
 def main(input_json_path: str, session_secret_key: str) -> Flask:
     with open(input_json_path) as f:
@@ -175,7 +151,6 @@ def main(input_json_path: str, session_secret_key: str) -> Flask:
 
 if __name__ == '__main__':
     app = App()
-    app.create_backup_manager()
 
     if app.args['debug']:
         flask_app = app.create_flask_app(session_secret_key=str(uuid.uuid4()),

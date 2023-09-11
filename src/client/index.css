@@ -1,10 +1,10 @@
 /* The sidebar menu */
 .sidenav {
-    height: 90%;
+    height: 80%;
     width: 400px; /* Set the width of the sidebar */
     position: fixed; /* Fixed Sidebar (stay in place on scroll) */
     z-index: 1; /* Stay on top */
-    top: 0; /* Stay at the top */
+    top: 60px; /* Stay at the top (below top menu) */
     left: 0;
     border: 2px solid rgb(223, 223, 223);
     border-top: none;
@@ -15,6 +15,7 @@
 /* Style page content */
 .app_container {
     margin-left: 400px; /* Same as the width of the sidebar */
+    margin-top: 60px; /* stay below top menu */
     width: calc(100% - 400px);
     overflow-x: hidden; !important;
   }
@@ -70,3 +71,113 @@ span.label_stats {
     /* Disable blue outline on focus */
     outline: none;
 }
+
+/***** Top menu *****/
+
+.navbar {
+    background: #444;
+    transition: all .6s;
+    backface-visibility: hidden;
+    box-shadow: 0 2px 5px 1px rgba(51, 51, 51, 0.5);
+}
+
+.navbar-brand {
+    /* make it not clickable */
+   pointer-events: none;
+   cursor: default;
+}
+
+.navbar-dark .navbar-nav {
+    font-size: 15px;
+    color: #fff;
+    text-transform: uppercase;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: #fff;
+    color: rgba(255, 255, 255, 0.8);
+    border: 0;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+    color: #fff;
+}
+
+.navbar-dark .navbar-nav .nav-link:focus {
+    color: #fff;
+    outline: 0;
+}
+
+.navbar-dark .navbar-toggler {
+    border-color: #444;
+}
+
+.navbar-dark .navbar-toggler:focus {
+    background: none;
+    outline: 0;
+}
+
+.navbar-dark .navbar-toggler span {
+    display: block;
+    width: 30px;
+    height: 2px;
+    margin: 6px auto;
+    background: #fff;
+    transition: all .6s cubic-bezier(0.250, 0.100, 0.250, 1.000);
+}
+
+.navbar-dark .navbar-toggler:hover span,
+.navbar-dark .navbar-toggler:focus span {
+    background: #ccc;
+}
+
+/* rotate first span */
+.navbar-dark .navbar-toggler[aria-expanded="true"] span:first-of-type {
+    transform: rotate(45deg) translate(6px, 6px);
+}
+
+/* hide second span */
+.navbar-dark .navbar-toggler[aria-expanded="true"] span:nth-of-type(2) {
+    opacity: 0;
+}
+
+/* rotate third span */
+.navbar-dark .navbar-toggler[aria-expanded="true"] span:last-of-type {
+    transform: rotate(-45deg) translate(5px, -5px);
+}
+
+.navbar-dark .navbar-toggler[aria-expanded="false"] span {
+    transform: none;
+    opacity: 1;
+}
+
+.navbar-dark .navbar-toggler span {
+    display: block;
+    width: 30px;
+    height: 2px;
+    margin: 6px auto;
+    background: #fff;
+    transition: all .6s cubic-bezier(0.250, 0.100, 0.250, 1.000);
+}
+
+/* rotate first span */
+.navbar-dark .navbar-toggler[aria-expanded="true"] span:first-of-type {
+    transform: rotate(45deg) translate(6px, 6px);
+}
+
+/* hide second span */
+.navbar-dark .navbar-toggler[aria-expanded="true"] span:nth-of-type(2) {
+    opacity: 0;
+}
+
+/* rotate third span */
+.navbar-dark .navbar-toggler[aria-expanded="true"] span:last-of-type {
+    transform: rotate(-45deg) translate(5px, -5px);
+}
+
+.navbar-dark .navbar-toggler[aria-expanded="false"] span {
+    transform: none;
+    opacity: 1;
+}
+
+/***** End top menu *****/

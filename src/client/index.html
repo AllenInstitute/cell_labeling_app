@@ -42,6 +42,34 @@
           href="{{ url_for('static', filename='index.css') }}">
 </head>
 <body>
+    <!-- Top menu -->
+    <nav class="navbar navbar-dark fixed-top">
+        <div class="container">
+
+            <a id="labeling_job_name" class="navbar-brand" href="#"></a>
+
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="labeling_job_select" style="color: white">Labeling job name</label>
+                            <select class="form-select"
+                                    id="labeling_job_select">
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </nav>
+    <!-- End top menu -->
 <div class="sidenav mt-4">
     <div class="sidenav-section" id="roi">
         <h3>ROI</h3>

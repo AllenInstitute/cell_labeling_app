@@ -14,10 +14,10 @@ from cell_labeling_app.database.database import db
 from flask import current_app
 
 from cell_labeling_app.database.schemas import JobRegion, UserLabels, \
-    LabelingJob, UserRoiExtra
+    UserRoiExtra
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from flask_login import current_user
-from sqlalchemy import func, desc
+from sqlalchemy import func
 
 
 def _is_roi_within_region(roi: Dict, region: JobRegion,
@@ -244,15 +244,17 @@ def get_artifacts_path(experiment_id: str):
 
 
 def get_region_label_counts(
+        job_id: int,
         exclude_current_user: bool = False,
         region_ids: Optional[List[int]] = None) -> pd.Series:
     """
+    :param job_id
+        Job id
     :param exclude_current_user: Exclude regions where current user
         contributed to completing it
     :param region_ids: Optional list of region ids to get counts for
     :return: Series with index region_id and values n_labelers
     """
-    job_id = _get_current_job_id()
     region_label_counts = \
         (db.session
          .query(UserLabels.region_id,
@@ -290,16 +292,22 @@ def get_region_label_counts(
     return region_label_counts
 
 
-def get_completed_regions(exclude_current_user: bool = False) -> List[int]:
+def get_completed_regions(
+    job_id: int,
+    exclude_current_user: bool = False
+) -> List[int]:
     """
     This returns the regions with sufficient number of labels
 
+    :param job_id
     :param exclude_current_user: Exclude regions where current user
         contributed to completing it (returns regions completed by others)
     :rtype: list of completed region ids
     """
     region_label_counts = get_region_label_counts(
-        exclude_current_user=exclude_current_user)
+        job_id=job_id,
+        exclude_current_user=exclude_current_user
+    )
     regions_with_enough_labels = \
         region_label_counts.loc[
             region_label_counts >=
@@ -308,9 +316,14 @@ def get_completed_regions(exclude_current_user: bool = False) -> List[int]:
     return regions_with_enough_labels
 
 
-def get_user_has_labeled() -> List[Dict]:
+def get_user_has_labeled(
+    job_id: int
+) -> List[Dict]:
     """
     Gets the list of region ids that the current user has labeled
+    :param job_id
+        Job id
+
     :return:
         List of dict with keys
             submitted: datetime label submitted
@@ -318,8 +331,6 @@ def get_user_has_labeled() -> List[Dict]:
             experiment_id
             x
     """
-    job_id = _get_current_job_id()
-
     user_has_labeled = \
         (db.session
          .query(UserLabels.timestamp.label('submitted'),
@@ -335,13 +346,16 @@ def get_user_has_labeled() -> List[Dict]:
 
 
 def get_next_region(
-        prioritize_regions_by_label_count: bool = True
+    job_id: int,
+    prioritize_regions_by_label_count: bool = True
 ) -> Optional[JobRegion]:
     """Samples a region randomly from a set of candidate regions.
     The candidate regions are those that have not already been labeled by the
     labeler and those that have not been labeled enough times by other
     labelers
 
+    :param job_id
+        Job id
     :param prioritize_regions_by_label_count: Whether to prioritize
         sampling regions that
         have been labeled more times. Encourages `LABELERS_REQUIRED_PER_REGION`
@@ -350,8 +364,8 @@ def get_next_region(
         JobRegion, if a candidate region exists, otherwise None
     """
     def get_regions_prioritized_by_num_labels(
-            labelers_required_per_region: int,
-            region_ids: List[int]
+        labelers_required_per_region: int,
+        region_ids: List[int]
     ) -> List[int]:
         """
 
@@ -361,20 +375,22 @@ def get_next_region(
         :return: region ids which have a label count closest to
             `labelers_required_per_region`
         """
-        label_counts = get_region_label_counts(region_ids=region_ids)
+        label_counts = get_region_label_counts(
+            region_ids=region_ids,
+            job_id=job_id
+        )
         label_counts = label_counts[
             label_counts < labelers_required_per_region]
         label_counts = label_counts.sort_values(ascending=False)
         prioritized_regions = label_counts[
             label_counts == label_counts.max()].index.tolist()
         return prioritized_regions
-    job_id = _get_current_job_id()
 
     # Get all region ids user has labeled
-    user_has_labeled = get_user_has_labeled()
+    user_has_labeled = get_user_has_labeled(job_id=job_id)
     user_has_labeled = [region['region_id'] for region in user_has_labeled]
 
-    regions_with_enough_labels = get_completed_regions()
+    regions_with_enough_labels = get_completed_regions(job_id=job_id)
     exclude_regions = user_has_labeled + regions_with_enough_labels
 
     # Get initial next region candidates query
@@ -409,24 +425,16 @@ def get_next_region(
     return next_region
 
 
-def _get_current_job_id() -> int:
-    """
-    Gets the current job id, where current is the most recently made
-    :return:
-        job id
-    """
-    job_id = db.session.query(LabelingJob.job_id).order_by(desc(
-        LabelingJob.date)).first()[0]
-    return job_id
-
-
-def get_total_regions_in_labeling_job() -> int:
+def get_total_regions_in_labeling_job(job_id) -> int:
     """
     Gets the total number of regions in the labeling job
+
+    :param job_id
+        Job id
+
     :return:
         total number of regions in labeling job
     """
-    job_id = _get_current_job_id()
     n = (db.session
          .query(JobRegion)
          .filter(JobRegion.job_id == job_id)

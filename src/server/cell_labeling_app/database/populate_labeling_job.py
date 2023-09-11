@@ -304,15 +304,20 @@ class RegionSampler:
         return experiment_ids
 
 
-def populate_labeling_job(regions: List[Region]):
+def populate_labeling_job(
+    name: str,
+    regions: List[Region]
+):
     """
     Creates a new labeling job
+    :param name
+        Labeling job name
     :param regions
         List of regions to add to the labeling job
     :return:
         None. Inserts records into the DB
     """
-    job = LabelingJob()
+    job = LabelingJob(name=name)
     db.session.add(job)
 
     job_id = db.session.query(LabelingJob.job_id).order_by(desc(
@@ -334,9 +339,15 @@ def populate_labeling_job(regions: List[Region]):
 if __name__ == '__main__':
     def main():
         parser = argparse.ArgumentParser()
-        parser.add_argument('--database_path', required=True,
-                            help='Path to where the database should get '
-                                 'created')
+        parser.add_argument('--labeling_job_name', required=True,
+                            help='Name to assign to this labeling job')
+        parser.add_argument(
+            '--sqlalchemy_database_uri', required=True,
+            help='Database URI. See '
+                 'https://docs.sqlalchemy.org/en/20/core/engines.html')
+        parser.add_argument('--create_database',
+                            default=False,
+                            help='Create the database if it does not exist')
         parser.add_argument('--n',
                             help='Number of experiments to include in the '
                                  'labeling job',
@@ -401,12 +412,11 @@ if __name__ == '__main__':
                              "the other. Exiting.")
 
         artifacts_dir = Path(args.artifact_files_dir)
-        database_path = Path(args.database_path)
 
         app = Flask(__name__)
-        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
+        app.config['SQLALCHEMY_DATABASE_URI'] = args.sqlalchemy_database_uri
         db.init_app(app)
-        if not database_path.is_file():
+        if args.create_database:
             with app.app_context():
                 db.create_all()
         app.app_context().push()
@@ -425,6 +435,8 @@ if __name__ == '__main__':
         regions = sampler.sample(
             exclude_motion_border=args.exclude_motion_border,
         )
-        populate_labeling_job(regions=regions)
+        populate_labeling_job(
+            name=args.labeling_job_name,
+            regions=regions)
 
     main()

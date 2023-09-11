@@ -84,6 +84,40 @@ class CellLabelingApp {
         $('#in-progress-no, #in-progress-modal-close').on('click', () => {
             $('#in-progress-warning-modal').modal('hide');
         });
+
+        $('select#labeling_job_select').on('change', () => {
+            this.handleLabelingJobChange();
+        })
+    }
+
+    async initializeTopMenu() {
+        /* Initialize top menu */
+        await this.initializeLabelingJobsDropdown();
+    }
+
+    async initializeLabelingJobsDropdown() {
+        /* Loads labeling jobs and initializes dropdown */
+        $('select#labeling_job_select').empty();
+        const jobs = await fetch(
+            `http://${SERVER_ADDRESS}/get_all_labeling_jobs`
+        ).then(res => res.json())
+            .then(res => res['jobs']);
+        jobs.forEach(project => {
+            $('select#labeling_job_select').append(`<option value="${project['id']}">${project['name']}</option>`);
+        });
+        if (Cookies.get('labeling_job') !== null) {
+            const jobId = Cookies.get('labeling_job');
+            $(`select#labeling_job_select option[value=${jobId}]`).attr('selected', 'selected');
+        }
+        const jobName = $('select#labeling_job_select').children("option:selected").text();
+        $('a#labeling_job_name').text(jobName);
+    }
+
+    handleLabelingJobChange() {
+        const selected_job = $('select#labeling_job_select').children("option:selected");
+        $('a#labeling_job_name').text(selected_job.text());
+        Cookies.set('labeling_job', selected_job.val());
+        this.#handleLabelNewRegionClick();
     }
 
     addProjectionListeners() {
@@ -449,7 +483,7 @@ class CellLabelingApp {
         return Promise.all(artifactLoaders);
     }
 
-    initialize() {
+    async initialize() {
         this.show_current_region_roi_contours_on_projection = $('#projection_include_mask_outline').is(':checked');
         this.show_current_roi_outline_on_movie = $('#video_include_mask_outline').is(':checked');
         this.show_all_roi_outlines_on_movie = $('#video_include_surrounding_rois').is(':checked');
@@ -499,7 +533,7 @@ class CellLabelingApp {
         }
         $('#projection-spinner').show();
         $('#movie').remove();
-        this.initialize();
+        await this.initialize();
         $('#loading_text').css('display', 'inline');
 
         let region;
@@ -508,7 +542,8 @@ class CellLabelingApp {
                 // Loading a random region
                 this.#populateSubmittedRegionsTable();
                 this.#updateProgress();
-                region = await $.get(`http://${SERVER_ADDRESS}/get_random_region`, data => {
+                const job_id = $('select#labeling_job_select').children("option:selected").val();
+                region = await $.get(`http://${SERVER_ADDRESS}/get_random_region?job_id=${job_id}`, data => {
                     if (data['region'] === null) {
                         // No more regions to label
                         window.location = `http://${SERVER_ADDRESS}/done.html`;
@@ -1133,7 +1168,8 @@ class CellLabelingApp {
     }
 
     async #populateSubmittedRegionsTable() {
-        const labels = await fetch('/get_user_submitted_labels')
+        const job_id = $('select#labeling_job_select').children("option:selected").val();
+        const labels = await fetch(`/get_user_submitted_labels?job_id=${job_id}`)
             .then(res => res.json())
             .then(res => res['labels']);
         labels.forEach(l => {
@@ -1305,8 +1341,9 @@ class CellLabelingApp {
     }
 
     async #updateProgress() {
+        const job_id = $('select#labeling_job_select').children("option:selected").val();
         fetch(
-        `http://${SERVER_ADDRESS}/get_label_stats`
+        `http://${SERVER_ADDRESS}/get_label_stats?job_id=${job_id}`
         )
         .then(data => data.json())
         .then(stats => {
@@ -1412,5 +1449,6 @@ const getFieldOfViewDimensions = async function() {
 $(document).ready(async function () {
     const field_of_view_dims = await getFieldOfViewDimensions();
     const app = new CellLabelingApp({field_of_view_dims});
+    await app.initializeTopMenu();
     app.loadNewRegion();
 });
