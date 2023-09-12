@@ -111,7 +111,7 @@ class ArtifactFile:
             trace = self._get_trace_for_user_added_roi(roi=roi)
         else:
             with h5py.File(self._path, 'r') as f:
-                trace = (f['traces'][roi_id][()])
+                trace = (f['traces'][str(roi_id)][()])
 
         return trace
 
