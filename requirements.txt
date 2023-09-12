@@ -11,3 +11,4 @@ gunicorn
 SQLAlchemy~=1.4.26
 pytest~=6.2.5
 ophys_etl_pipelines @ git+https://github.com/AllenInstitute/ophys_etl_pipelines@workflow_v2
+pg8000
