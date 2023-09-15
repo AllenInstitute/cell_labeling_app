@@ -15,9 +15,10 @@ const login = function() {
     const postData = {
         email
     };
-    return $.post('/users/login', JSON.stringify(postData)).then(() => {
+    return $.post('/users/login', JSON.stringify(postData))
+    .then(() => {
         window.location = `http://${SERVER_ADDRESS}/`;
-    });
+    }).catch(() => alert('The login did not work'));
 };
 
 $( document ).ready(function() {

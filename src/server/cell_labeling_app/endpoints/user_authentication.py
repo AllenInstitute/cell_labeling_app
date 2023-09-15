@@ -8,15 +8,6 @@ from cell_labeling_app.database.schemas import User
 users = Blueprint(name='users', import_name=__name__, url_prefix='/users')
 
 
-@users.route('/register.html')
-def load_register_page():
-    return render_template(
-        'register.html',
-        port=current_app.config['PORT'],
-        server_address=current_app.config['server_address']
-    )
-
-
 @users.route('/register', methods=['POST'])
 def register():
     request_data = request.get_json(force=True)
@@ -32,9 +23,6 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        # then login
-        user = db.session.query(User).filter_by(id=user.id).first()
-        login_user(user)
         return 'success'
 
 
@@ -60,6 +48,8 @@ def login():
 
     user = db.session.query(User).filter_by(id=request_data[
         'email']).first()
+    if user is None:
+        return 'failure', 400
     login_user(user)
 
     return 'success'
