@@ -2,6 +2,7 @@ import argschema
 import json
 import requests
 
+
 class RegisterSchema(argschema.ArgSchema):
     email_list = argschema.fields.List(
         argschema.fields.String,
