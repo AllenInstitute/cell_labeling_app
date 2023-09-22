@@ -221,14 +221,18 @@ def get_fov_bounds():
     contours = util.get_roi_contours_in_region(
         experiment_id=r['experiment_id'], region=region)
 
-    x = np.array([x['box_x'] for x in contours])
-    y = np.array([x['box_y'] for x in contours])
+    if len(contours) == 0:
+        x_min, x_max = region.x, region.x + region.width
+        y_min, y_max = region.y, region.y + region.height
+    else:
+        x = np.array([x['box_x'] for x in contours])
+        y = np.array([x['box_y'] for x in contours])
 
-    widths = np.array([x['box_width'] for x in contours])
-    heights = np.array([x['box_height'] for x in contours])
+        widths = np.array([x['box_width'] for x in contours])
+        heights = np.array([x['box_height'] for x in contours])
 
-    x_min, x_max = x.min(), (x + widths).max()
-    y_min, y_max = y.min(), (y + heights).max()
+        x_min, x_max = x.min(), (x + widths).max()
+        y_min, y_max = y.min(), (y + heights).max()
 
     # Find the larger box, either the region box or the box containing all ROIs
     # that are contained within or overlap within the box
