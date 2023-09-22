@@ -167,7 +167,7 @@ class CellLabelingApp {
             let trace = data['trace'].slice(firstNonZeroIndex);
 
             trace = {
-                x: _.range(firstNonZeroIndex, trace.length),
+                x: _.range(firstNonZeroIndex, data['trace'].length),
                 y: trace
             }
 
