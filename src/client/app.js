@@ -161,9 +161,14 @@ class CellLabelingApp {
             })
         }).then(async response => await response.json())
         .then(data => {
-            const trace = {
-                x: _.range(data['trace'].length),
-                y: data['trace']
+
+            // Truncating trace since the first n timesteps in the movie might be blank frames
+            const firstNonZeroIndex = _.findIndex(data['trace'].map(x => x !== 0));
+            let trace = data['trace'].slice(firstNonZeroIndex);
+
+            trace = {
+                x: _.range(firstNonZeroIndex, data['trace'].length),
+                y: trace
             }
 
             const layout = {
