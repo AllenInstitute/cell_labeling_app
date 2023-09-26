@@ -36,10 +36,9 @@ class Register(argschema.ArgSchemaParser):
             elif ans.status_code == 200:
                 print(f"Successfully added {email}")
             else:
-                message = json.loads(ans.content)
                 print(
                     f"Unexpected request error on {email}: "
-                    f"Code: {ans.status_code}, message: {message['msg']}"
+                    f"Code: {ans.status_code}, message: {ans.content}"
                 )
 
 
