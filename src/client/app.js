@@ -1376,18 +1376,21 @@ class CellLabelingApp {
     }
 
     #isUnsavedChanges() {
-        /* Check if the user made any unsaved changes */
-        const rois = this.rois
+        let rois = this.rois === null ? [] : this.rois;
+        const roisUnchanged = this.roisUnchanged === null ? [] : this.roisUnchanged;
+
+        // Check if the user made any unsaved changes
+        rois = rois
             // Filtering out any currently selected non-cell points
             .filter(x => x.contours !== null ||
                    (x.point !== null && x.label === 'cell'));
 
-        if (rois.length !== this.roisUnchanged.length) {
+        if (rois.length !== roisUnchanged.length) {
             return true;
         }
 
         return rois.some((roi, idx) => {
-            if (roi.label !== this.roisUnchanged[idx].label) {
+            if (roi.label !== roisUnchanged[idx].label) {
                 return true;
             }
 
