@@ -14,7 +14,7 @@ from cell_labeling_app.database.database import db
 from flask import current_app
 
 from cell_labeling_app.database.schemas import JobRegion, UserLabels, \
-    UserRoiExtra
+    UserRoiExtra, LabelingJob
 from cell_labeling_app.imaging_plane_artifacts import ArtifactFile
 from flask_login import current_user
 from sqlalchemy import func
@@ -490,15 +490,21 @@ def get_all_labels() -> pd.DataFrame:
     """Gets all labels"""
     labels = (
         db.session.query(
+            LabelingJob.name,
             JobRegion.experiment_id,
             UserLabels.labels,
             UserLabels.user_id)
         .join(JobRegion,
               JobRegion.id == UserLabels.region_id)
+        .join(LabelingJob,
+              LabelingJob.job_id == JobRegion.job_id)
         .all()
     )
     labels = pd.DataFrame(labels,
-                          columns=['experiment_id', 'labels', 'user_id'])
+                          columns=['job_name',
+                                   'experiment_id',
+                                   'labels',
+                                   'user_id'])
     return labels
 
 
