@@ -161,7 +161,8 @@ class TestGetNextRegion:
 
         labels = get_all_labels()
         assert labels.shape[0] > 0 and \
-               set(labels.columns) == {'experiment_id', 'labels', 'user_id'}
+               set(labels.columns) == {'experiment_id', 'labels', 'user_id',
+                                       'job_name'}
 
     @staticmethod
     def _get_next_region(user_id: str,
