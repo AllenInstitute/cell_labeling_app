@@ -55,7 +55,7 @@ class Register(argschema.ArgSchemaParser):
             data=json.dumps({'email': self.args['admin_username']})
         )
         if res.status_code != 200:
-            print(f'Unable to login {self.args["admin_username"]}')
+            raise ValueError(f'Unable to login {self.args["admin_username"]}')
         return session
 
 
