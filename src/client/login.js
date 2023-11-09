@@ -1,15 +1,3 @@
-const loadUsers = function() {
-    $.get('/users/loadUsers').then(data => {
-        const users = data['users'];
-        const userSelectOptions = users.map(user => {
-            return `<option value=${user}>${user}</option>`;
-        });
-        userSelectOptions.forEach(option => {
-            $('select#inputEmail').append(option);
-        });
-    });
-};
-
 const login = function() {
     const email = $('#inputEmail').val();
     const postData = {
@@ -22,8 +10,6 @@ const login = function() {
 };
 
 $( document ).ready(function() {
-    loadUsers();
-    
     $('button#login').on('click', () => {
         login();
     });

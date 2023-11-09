@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 from flask import render_template, request, send_file, Blueprint, \
     current_app
-from flask_login import current_user
+from flask_login import current_user, login_required
 from ophys_etl.modules.roi_cell_classifier.video_utils import (
     get_thumbnail_video_from_artifact_file)
 
@@ -39,11 +39,13 @@ def index():
 
 
 @api.route('/done.html')
+@login_required
 def done():
     return render_template('done.html')
 
 
 @api.route('/get_roi_contours')
+@login_required
 def get_roi_contours():
     experiment_id = request.args['experiment_id']
     current_region_id = request.args['current_region_id']
@@ -60,6 +62,7 @@ def get_roi_contours():
 
 
 @api.route("/get_random_region")
+@login_required
 def get_random_region():
     job_id = int(request.args['job_id'])
     next_region = get_next_region(job_id=job_id)
@@ -78,6 +81,7 @@ def get_random_region():
 
 
 @api.route('/get_projection')
+@login_required
 def get_projection():
     projection_type = request.args['type']
     experiment_id = request.args['experiment_id']
@@ -98,6 +102,7 @@ def get_projection():
 
 
 @api.route('/get_trace', methods=['POST'])
+@login_required
 def get_trace():
     request_data = request.get_json(force=True)
     trace = util.get_trace(
@@ -119,6 +124,7 @@ def get_trace():
 
 
 @api.route('/get_motion_border')
+@login_required
 def get_motion_border():
     experiment_id = request.args['experiment_id']
     artifact_path = get_artifacts_path(experiment_id=experiment_id)
@@ -133,6 +139,7 @@ def get_motion_border():
 
 
 @api.route('/get_video', methods=['POST'])
+@login_required
 def get_video():
     request_data = request.get_json(force=True)
     experiment_id = request_data['experiment_id']
@@ -189,6 +196,7 @@ def get_video():
 
 
 @api.route('/get_default_video_timeframe', methods=['POST'])
+@login_required
 def get_default_video_timeframe():
     request_data = request.get_json(force=True)
     trace = util.get_trace(
@@ -206,6 +214,7 @@ def get_default_video_timeframe():
 
 
 @api.route('/get_fov_bounds', methods=['POST'])
+@login_required
 def get_fov_bounds():
     """The FOV bounds are the min/max x, y values of the bounding boxes to
     all ROIs that fit in the region. The reason why the region x, y, width,
@@ -258,6 +267,7 @@ def get_fov_bounds():
 
 
 @api.route('/get_field_of_view_dimensions')
+@login_required
 def get_field_of_view_dimensions():
     dims = current_app.config['FIELD_OF_VIEW_DIMENSIONS']
     return {
@@ -266,6 +276,7 @@ def get_field_of_view_dimensions():
 
 
 @api.route('/submit_region', methods=['POST'])
+@login_required
 def submit_region():
     """Inserts records for labels and additional user-submitted roi metadata"""
     data = request.get_json(force=True)
@@ -289,6 +300,7 @@ def submit_region():
 
 
 @api.route('/find_roi_at_coordinates', methods=['POST'])
+@login_required
 def find_roi_at_coordinates():
     """
     Finds ROI id at field of view x, y coordinates
@@ -360,6 +372,7 @@ def find_roi_at_coordinates():
 
 
 @api.route('/get_label_stats', methods=['GET'])
+@login_required
 def get_label_stats():
     """
     Gets stats on user label counts, and num. remaining
@@ -391,6 +404,7 @@ def after_request(response):
 
 
 @api.route('/get_user_submitted_labels')
+@login_required
 def get_user_submitted_labels():
     job_id = int(request.args['job_id'])
     labels = get_user_has_labeled(job_id=job_id)
@@ -406,6 +420,7 @@ def get_user_submitted_labels():
 
 
 @api.route('/get_region', methods=['GET'])
+@login_required
 def get_region():
     region_id = request.args['region_id']
     region_id = int(region_id)
@@ -421,6 +436,7 @@ def get_region():
 
 
 @api.route('/get_labels_for_region', methods=['GET'])
+@login_required
 def get_labels_for_region():
     region_id = request.args['region_id']
     region_id = int(region_id)
@@ -438,6 +454,7 @@ def get_all_labels():
 
 
 @api.route('/update_labels_for_region', methods=['POST'])
+@login_required
 def update_labels_for_region():
     data = request.get_json(force=True)
     util.update_labels_for_region(region_id=data['region_id'],
@@ -448,6 +465,7 @@ def update_labels_for_region():
 
 
 @api.route('/get_all_labeling_jobs', methods=['GET'])
+@login_required
 def get_all_labeling_jobs():
     jobs = (db.session.query(LabelingJob).all())
     jobs = [
